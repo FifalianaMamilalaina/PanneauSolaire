@@ -1,0 +1,727 @@
+"""
+Interface graphique (Tkinter) pour le système de gestion d'énergie solaire.
+Fenêtrage complet avec navigation par onglets, formulaires, tableaux et résultats visuels.
+"""
+import sys
+import os
+import tkinter as tk
+from tkinter import ttk, messagebox, font as tkfont
+
+# Ajouter le répertoire courant au path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from database.connection import init_database
+from database.crud import (
+    insert_appareil,
+    get_all_appareils,
+    get_appareil_by_id,
+    delete_appareil,
+    save_resultat,
+    get_all_resultats
+)
+from services.simulation_service import simuler_journee
+from utils.conversions import formater_energie, formater_puissance
+
+
+# ==========================================
+# Palette de couleurs
+# ==========================================
+COLORS = {
+    "bg_dark": "#1a1a2e",
+    "bg_sidebar": "#16213e",
+    "bg_card": "#0f3460",
+    "bg_input": "#1a1a3e",
+    "accent": "#e94560",
+    "accent_hover": "#ff6b81",
+    "solar_yellow": "#f5a623",
+    "solar_orange": "#f39c12",
+    "battery_green": "#27ae60",
+    "battery_blue": "#2980b9",
+    "text_primary": "#ffffff",
+    "text_secondary": "#a0a0c0",
+    "text_muted": "#6c6c8a",
+    "success": "#2ecc71",
+    "warning": "#f39c12",
+    "danger": "#e74c3c",
+    "border": "#2a2a4a",
+}
+
+
+# ==========================================
+# Application principale
+# ==========================================
+class SolaireApp(tk.Tk):
+    """Fenêtre principale de l'application Solaire."""
+
+    def __init__(self):
+        super().__init__()
+
+        self.title("☀️ Système de Gestion d'Énergie Solaire")
+        self.geometry("1100x700")
+        self.minsize(900, 600)
+        self.configure(bg=COLORS["bg_dark"])
+
+        # Binding global (pour cleanup)
+        self._global_bindings = []
+
+        # Polices
+        self.font_title = tkfont.Font(family="Segoe UI", size=18, weight="bold")
+        self.font_heading = tkfont.Font(family="Segoe UI", size=14, weight="bold")
+        self.font_subheading = tkfont.Font(family="Segoe UI", size=11, weight="bold")
+        self.font_body = tkfont.Font(family="Segoe UI", size=10)
+        self.font_small = tkfont.Font(family="Segoe UI", size=9)
+        self.font_btn = tkfont.Font(family="Segoe UI", size=10, weight="bold")
+        self.font_menu = tkfont.Font(family="Segoe UI", size=11)
+        self.font_big_value = tkfont.Font(family="Segoe UI", size=22, weight="bold")
+
+        # Style ttk
+        self._setup_styles()
+
+        # Initialiser la DB
+        self._init_db()
+
+        # Layout principal
+        self._build_sidebar()
+        self._build_main_area()
+
+        # Afficher la page d'accueil
+        self.show_page("accueil")
+
+    def _setup_styles(self):
+        """Configure les styles ttk pour les Treeview et scrollbars."""
+        style = ttk.Style(self)
+        style.theme_use("clam")
+
+        style.configure("Dark.Treeview",
+                        background=COLORS["bg_dark"],
+                        foreground=COLORS["text_primary"],
+                        fieldbackground=COLORS["bg_dark"],
+                        borderwidth=0,
+                        rowheight=30,
+                        font=("Segoe UI", 10))
+        style.configure("Dark.Treeview.Heading",
+                        background=COLORS["bg_card"],
+                        foreground=COLORS["solar_yellow"],
+                        font=("Segoe UI", 10, "bold"),
+                        borderwidth=0)
+        style.map("Dark.Treeview",
+                  background=[("selected", COLORS["bg_card"])],
+                  foreground=[("selected", COLORS["solar_yellow"])])
+
+        style.configure("Dark.Vertical.TScrollbar",
+                        background=COLORS["bg_sidebar"],
+                        troughcolor=COLORS["bg_dark"],
+                        borderwidth=0,
+                        arrowsize=0)
+
+    def _init_db(self):
+        """Initialise la base de données au démarrage."""
+        try:
+            init_database()
+        except Exception as e:
+            messagebox.showerror(
+                "Erreur de connexion",
+                f"Impossible de se connecter à SQL Server :\n{e}\n\n"
+                f"Vérifiez que SQL Server est démarré."
+            )
+
+    # ------------------------------------------
+    # Sidebar
+    # ------------------------------------------
+    def _build_sidebar(self):
+        """Construit la barre latérale de navigation."""
+        self.sidebar = tk.Frame(self, bg=COLORS["bg_sidebar"], width=220)
+        self.sidebar.pack(side=tk.LEFT, fill=tk.Y)
+        self.sidebar.pack_propagate(False)
+
+        # Titre application
+        title_frame = tk.Frame(self.sidebar, bg=COLORS["bg_sidebar"])
+        title_frame.pack(fill=tk.X, pady=(20, 30), padx=15)
+
+        tk.Label(title_frame, text="☀️", font=("Segoe UI", 28),
+                 bg=COLORS["bg_sidebar"], fg=COLORS["solar_yellow"]).pack()
+        tk.Label(title_frame, text="SOLAIRE", font=self.font_title,
+                 bg=COLORS["bg_sidebar"], fg=COLORS["text_primary"]).pack()
+        tk.Label(title_frame, text="Gestion d'Énergie", font=self.font_small,
+                 bg=COLORS["bg_sidebar"], fg=COLORS["text_muted"]).pack()
+
+        # Séparateur
+        tk.Frame(self.sidebar, bg=COLORS["border"], height=1).pack(fill=tk.X, padx=20, pady=5)
+
+        # Boutons du menu
+        self.menu_buttons = {}
+        menu_items = [
+            ("accueil", "🏠  Accueil"),
+            ("ajouter", "➕  Ajouter Appareil"),
+            ("liste", "📋  Liste Appareils"),
+            ("simulation", "🚀  Simulation"),
+            ("historique", "📜  Historique"),
+        ]
+
+        for page_name, label in menu_items:
+            btn = tk.Label(
+                self.sidebar, text=label, font=self.font_menu,
+                bg=COLORS["bg_sidebar"], fg=COLORS["text_secondary"],
+                anchor="w", padx=20, pady=10, cursor="hand2"
+            )
+            btn.pack(fill=tk.X, pady=1)
+            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=COLORS["bg_card"], fg=COLORS["text_primary"]))
+            btn.bind("<Leave>", lambda e, b=btn, p=page_name: self._menu_leave(b, p))
+            btn.bind("<Button-1>", lambda e, p=page_name: self.show_page(p))
+            self.menu_buttons[page_name] = btn
+
+    def _menu_leave(self, btn, page_name):
+        """Gère le survol de sortie du menu."""
+        if getattr(self, '_current_page', None) == page_name:
+            btn.config(bg=COLORS["bg_card"], fg=COLORS["solar_yellow"])
+        else:
+            btn.config(bg=COLORS["bg_sidebar"], fg=COLORS["text_secondary"])
+
+    # ------------------------------------------
+    # Zone principale
+    # ------------------------------------------
+    def _build_main_area(self):
+        """Construit la zone de contenu principal."""
+        self.main_area = tk.Frame(self, bg=COLORS["bg_dark"])
+        self.main_area.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+
+        self.pages = {}
+
+    def show_page(self, page_name):
+        """Affiche une page dans la zone principale."""
+        # Mettre à jour le style du menu
+        self._current_page = page_name
+        for name, btn in self.menu_buttons.items():
+            if name == page_name:
+                btn.config(bg=COLORS["bg_card"], fg=COLORS["solar_yellow"])
+            else:
+                btn.config(bg=COLORS["bg_sidebar"], fg=COLORS["text_secondary"])
+
+        # Nettoyer les bindings globaux
+        for seq, func_id in self._global_bindings:
+            self.unbind_all(seq)
+        self._global_bindings = []
+
+        # Effacer le contenu actuel
+        for widget in self.main_area.winfo_children():
+            widget.destroy()
+
+        # Construire la page
+        builders = {
+            "accueil": self._page_accueil,
+            "ajouter": self._page_ajouter,
+            "liste": self._page_liste,
+            "simulation": self._page_simulation,
+            "historique": self._page_historique,
+        }
+        builder = builders.get(page_name)
+        if builder:
+            builder()
+
+    # ------------------------------------------
+    # Helpers UI
+    # ------------------------------------------
+    def _make_header(self, parent, title, subtitle=""):
+        """Crée un en-tête de page."""
+        header = tk.Frame(parent, bg=COLORS["bg_dark"])
+        header.pack(fill=tk.X, padx=30, pady=(25, 15))
+        tk.Label(header, text=title, font=self.font_title,
+                 bg=COLORS["bg_dark"], fg=COLORS["text_primary"]).pack(anchor="w")
+        if subtitle:
+            tk.Label(header, text=subtitle, font=self.font_body,
+                     bg=COLORS["bg_dark"], fg=COLORS["text_muted"]).pack(anchor="w", pady=(2, 0))
+        tk.Frame(parent, bg=COLORS["border"], height=1).pack(fill=tk.X, padx=30, pady=(0, 15))
+        return header
+
+    def _make_card(self, parent, **pack_kwargs):
+        """Crée un cadre style carte."""
+        card = tk.Frame(parent, bg=COLORS["bg_card"],
+                        highlightbackground=COLORS["border"], highlightthickness=1)
+        card.pack(padx=30, pady=8, fill=tk.X, **pack_kwargs)
+        return card
+
+    def _make_button(self, parent, text, command, color=None, width=20):
+        """Crée un bouton stylisé."""
+        bg = color or COLORS["accent"]
+        btn = tk.Label(
+            parent, text=text, font=self.font_btn,
+            bg=bg, fg=COLORS["text_primary"],
+            padx=20, pady=8, cursor="hand2", width=width,
+            anchor="center"
+        )
+        btn.bind("<Enter>", lambda e: btn.config(bg=COLORS["accent_hover"]))
+        btn.bind("<Leave>", lambda e: btn.config(bg=bg))
+        btn.bind("<Button-1>", lambda e: command())
+        return btn
+
+    def _make_entry(self, parent, label_text, row):
+        """Crée un champ de saisie avec label."""
+        tk.Label(parent, text=label_text, font=self.font_body,
+                 bg=COLORS["bg_card"], fg=COLORS["text_secondary"]).grid(
+            row=row, column=0, sticky="w", padx=15, pady=8)
+
+        entry = tk.Entry(parent, font=self.font_body,
+                         bg=COLORS["bg_input"], fg=COLORS["text_primary"],
+                         insertbackground=COLORS["text_primary"],
+                         relief="flat", highlightthickness=1,
+                         highlightbackground=COLORS["border"],
+                         highlightcolor=COLORS["solar_yellow"])
+        entry.grid(row=row, column=1, sticky="ew", padx=(5, 15), pady=8, ipady=4)
+        return entry
+
+    def _make_stat_card(self, parent, icon, label, value, color):
+        """Crée une carte statistique compacte."""
+        card = tk.Frame(parent, bg=COLORS["bg_card"],
+                        highlightbackground=color, highlightthickness=2)
+
+        tk.Label(card, text=icon, font=("Segoe UI", 24),
+                 bg=COLORS["bg_card"], fg=color).pack(pady=(12, 2))
+        tk.Label(card, text=value, font=self.font_big_value,
+                 bg=COLORS["bg_card"], fg=COLORS["text_primary"]).pack()
+        tk.Label(card, text=label, font=self.font_small,
+                 bg=COLORS["bg_card"], fg=COLORS["text_muted"]).pack(pady=(0, 12))
+        return card
+
+    # ------------------------------------------
+    # PAGE: Accueil
+    # ------------------------------------------
+    def _page_accueil(self):
+        """Page d'accueil avec résumé du système."""
+        self._make_header(self.main_area, "Tableau de bord", "Vue d'ensemble de votre installation solaire")
+
+        # Charger les données
+        try:
+            appareils = get_all_appareils()
+        except Exception:
+            appareils = []
+
+        nb_total = len(appareils)
+        nb_matin = sum(1 for a in appareils if a.tranche == "matin")
+        nb_soir = sum(1 for a in appareils if a.tranche == "soir")
+        nb_nuit = sum(1 for a in appareils if a.tranche == "nuit")
+        conso_totale = sum(a.energie_wh() for a in appareils)
+
+        # Cartes statistiques
+        stats_frame = tk.Frame(self.main_area, bg=COLORS["bg_dark"])
+        stats_frame.pack(fill=tk.X, padx=30, pady=10)
+        stats_frame.columnconfigure((0, 1, 2, 3), weight=1)
+
+        cards_data = [
+            ("⚡", "Appareils", str(nb_total), COLORS["solar_yellow"]),
+            ("☀️", "Jour (Matin)", str(nb_matin), COLORS["solar_orange"]),
+            ("🌙", "Nuit", str(nb_nuit), COLORS["battery_blue"]),
+            ("🔋", "Conso. Totale", formater_energie(conso_totale), COLORS["battery_green"]),
+        ]
+
+        for i, (icon, label, value, color) in enumerate(cards_data):
+            card = self._make_stat_card(stats_frame, icon, label, value, color)
+            card.grid(row=0, column=i, padx=8, pady=5, sticky="nsew")
+
+        # Info appareils soir
+        if nb_soir > 0:
+            info_card = self._make_card(self.main_area)
+            tk.Label(info_card, text=f"🌆  {nb_soir} appareil(s) en tranche soir (17h-19h) — alimentés à 50% solaire / 50% batterie",
+                     font=self.font_body, bg=COLORS["bg_card"],
+                     fg=COLORS["text_secondary"]).pack(padx=15, pady=10)
+
+        # Actions rapides
+        actions_frame = tk.Frame(self.main_area, bg=COLORS["bg_dark"])
+        actions_frame.pack(fill=tk.X, padx=30, pady=20)
+
+        tk.Label(actions_frame, text="Actions rapides", font=self.font_heading,
+                 bg=COLORS["bg_dark"], fg=COLORS["text_primary"]).pack(anchor="w", pady=(0, 10))
+
+        btns_frame = tk.Frame(actions_frame, bg=COLORS["bg_dark"])
+        btns_frame.pack(fill=tk.X)
+
+        self._make_button(btns_frame, "➕  Ajouter un appareil",
+                          lambda: self.show_page("ajouter"),
+                          color=COLORS["battery_green"], width=25).pack(side=tk.LEFT, padx=(0, 10))
+        self._make_button(btns_frame, "🚀  Lancer la simulation",
+                          lambda: self.show_page("simulation"),
+                          color=COLORS["accent"], width=25).pack(side=tk.LEFT, padx=(0, 10))
+        self._make_button(btns_frame, "📜  Voir l'historique",
+                          lambda: self.show_page("historique"),
+                          color=COLORS["battery_blue"], width=25).pack(side=tk.LEFT)
+
+    # ------------------------------------------
+    # PAGE: Ajouter un appareil
+    # ------------------------------------------
+    def _page_ajouter(self):
+        """Formulaire d'ajout d'appareil."""
+        self._make_header(self.main_area, "Ajouter un appareil", "Enregistrer un nouvel appareil électrique")
+
+        card = self._make_card(self.main_area)
+        card.columnconfigure(1, weight=1)
+
+        # Champs
+        self._entry_nom = self._make_entry(card, "Nom de l'appareil :", 0)
+        self._entry_puissance = self._make_entry(card, "Puissance (W) :", 1)
+        self._entry_duree = self._make_entry(card, "Durée d'utilisation (h) :", 2)
+
+        # Tranche (ComboBox)
+        tk.Label(card, text="Tranche horaire :", font=self.font_body,
+                 bg=COLORS["bg_card"], fg=COLORS["text_secondary"]).grid(
+            row=3, column=0, sticky="w", padx=15, pady=8)
+
+        self._combo_tranche = ttk.Combobox(card, font=self.font_body,
+                                           state="readonly",
+                                           values=["matin (06h → 17h)", "soir (17h → 19h)", "nuit (19h → 06h)"])
+        self._combo_tranche.set("matin (06h → 17h)")
+        self._combo_tranche.grid(row=3, column=1, sticky="ew", padx=(5, 15), pady=8, ipady=4)
+
+        # Bouton ajouter
+        btn_frame = tk.Frame(card, bg=COLORS["bg_card"])
+        btn_frame.grid(row=4, column=0, columnspan=2, pady=15)
+
+        self._make_button(btn_frame, "✅  Ajouter l'appareil",
+                          self._action_ajouter,
+                          color=COLORS["battery_green"], width=30).pack()
+
+        # Zone de message
+        self._label_message = tk.Label(self.main_area, text="", font=self.font_body,
+                                       bg=COLORS["bg_dark"], fg=COLORS["success"])
+        self._label_message.pack(pady=5)
+
+    def _action_ajouter(self):
+        """Action du bouton Ajouter."""
+        nom = self._entry_nom.get().strip()
+        puissance_str = self._entry_puissance.get().strip()
+        duree_str = self._entry_duree.get().strip()
+        tranche_raw = self._combo_tranche.get()
+
+        if not nom:
+            messagebox.showwarning("Champ manquant", "Le nom de l'appareil est requis.")
+            return
+
+        try:
+            puissance = float(puissance_str)
+            duree = float(duree_str)
+        except ValueError:
+            messagebox.showwarning("Valeur invalide", "La puissance et la durée doivent être des nombres.")
+            return
+
+        if puissance <= 0 or duree <= 0:
+            messagebox.showwarning("Valeur invalide", "La puissance et la durée doivent être positives.")
+            return
+
+        tranche = tranche_raw.split(" ")[0]  # "matin (06h..." → "matin"
+
+        try:
+            insert_appareil(nom, puissance, duree, tranche)
+            energie = puissance * duree
+            self._label_message.config(
+                text=f"✅ '{nom}' ajouté — {puissance}W × {duree}h = {energie} Wh [{tranche}]",
+                fg=COLORS["success"])
+            # Vider les champs
+            self._entry_nom.delete(0, tk.END)
+            self._entry_puissance.delete(0, tk.END)
+            self._entry_duree.delete(0, tk.END)
+            self._combo_tranche.set("matin (06h → 17h)")
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible d'ajouter l'appareil :\n{e}")
+
+    # ------------------------------------------
+    # PAGE: Liste des appareils
+    # ------------------------------------------
+    def _page_liste(self):
+        """Tableau des appareils avec suppression."""
+        self._make_header(self.main_area, "Liste des appareils", "Tous les appareils enregistrés")
+
+        # Treeview
+        tree_frame = tk.Frame(self.main_area, bg=COLORS["bg_dark"])
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=30, pady=(0, 10))
+
+        columns = ("id", "nom", "puissance", "duree", "energie", "tranche")
+        self._tree = ttk.Treeview(tree_frame, columns=columns, show="headings",
+                                  style="Dark.Treeview", selectmode="browse")
+
+        headers = {
+            "id": ("ID", 50),
+            "nom": ("Nom", 200),
+            "puissance": ("Puissance (W)", 120),
+            "duree": ("Durée (h)", 100),
+            "energie": ("Énergie (Wh)", 120),
+            "tranche": ("Tranche", 100),
+        }
+        for col, (text, width) in headers.items():
+            self._tree.heading(col, text=text)
+            self._tree.column(col, width=width, anchor="center")
+
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self._tree.yview,
+                                  style="Dark.Vertical.TScrollbar")
+        self._tree.configure(yscrollcommand=scrollbar.set)
+
+        self._tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Boutons
+        btn_frame = tk.Frame(self.main_area, bg=COLORS["bg_dark"])
+        btn_frame.pack(fill=tk.X, padx=30, pady=(0, 20))
+
+        self._make_button(btn_frame, "🗑️  Supprimer sélection",
+                          self._action_supprimer,
+                          color=COLORS["danger"], width=25).pack(side=tk.LEFT, padx=(0, 10))
+        self._make_button(btn_frame, "🔄  Rafraîchir",
+                          lambda: self.show_page("liste"),
+                          color=COLORS["battery_blue"], width=15).pack(side=tk.LEFT)
+
+        # Charger les données
+        self._charger_appareils()
+
+    def _charger_appareils(self):
+        """Charge les appareils dans le Treeview."""
+        for item in self._tree.get_children():
+            self._tree.delete(item)
+
+        try:
+            appareils = get_all_appareils()
+            for a in appareils:
+                self._tree.insert("", tk.END, values=(
+                    a.id, a.nom, f"{a.puissance_w:.1f}", f"{a.duree_h:.1f}",
+                    f"{a.energie_wh():.1f}", a.tranche
+                ))
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible de charger les appareils :\n{e}")
+
+    def _action_supprimer(self):
+        """Supprime l'appareil sélectionné."""
+        selected = self._tree.selection()
+        if not selected:
+            messagebox.showinfo("Information", "Veuillez sélectionner un appareil à supprimer.")
+            return
+
+        item = self._tree.item(selected[0])
+        appareil_id = item["values"][0]
+        nom = item["values"][1]
+
+        if messagebox.askyesno("Confirmation", f"Supprimer l'appareil '{nom}' (ID {appareil_id}) ?"):
+            try:
+                delete_appareil(appareil_id)
+                self._charger_appareils()
+            except Exception as e:
+                messagebox.showerror("Erreur", f"Impossible de supprimer :\n{e}")
+
+    # ------------------------------------------
+    # PAGE: Simulation
+    # ------------------------------------------
+    def _page_simulation(self):
+        """Page de simulation avec résultats visuels."""
+        self._make_header(self.main_area, "Simulation", "Simuler une journée complète et dimensionner le système")
+
+        # Scrollable frame
+        canvas = tk.Canvas(self.main_area, bg=COLORS["bg_dark"], highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.main_area, orient=tk.VERTICAL, command=canvas.yview,
+                                  style="Dark.Vertical.TScrollbar")
+        self._sim_frame = tk.Frame(canvas, bg=COLORS["bg_dark"])
+
+        self._sim_frame.bind("<Configure>",
+                              lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=self._sim_frame, anchor="nw", tags="frame")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Responsive width
+        def on_canvas_configure(event):
+            canvas.itemconfig("frame", width=event.width)
+        canvas.bind("<Configure>", on_canvas_configure)
+
+        # Mousewheel scroll
+        def on_mousewheel(event):
+            if canvas.winfo_exists():
+                canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        canvas.bind_all("<MouseWheel>", on_mousewheel)
+        self._global_bindings.append(("<MouseWheel>", None))
+
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        # Bouton lancer simulation
+        btn_frame = tk.Frame(self._sim_frame, bg=COLORS["bg_dark"])
+        btn_frame.pack(fill=tk.X, padx=30, pady=10)
+
+        self._make_button(btn_frame, "🚀  Lancer la simulation",
+                          self._action_simuler,
+                          color=COLORS["accent"], width=30).pack(anchor="w")
+
+        # Zone résultats (sera remplie après simulation)
+        self._result_container = tk.Frame(self._sim_frame, bg=COLORS["bg_dark"])
+        self._result_container.pack(fill=tk.BOTH, expand=True)
+
+    def _action_simuler(self):
+        """Lance la simulation et affiche les résultats."""
+        # Vider les résultats précédents
+        for widget in self._result_container.winfo_children():
+            widget.destroy()
+
+        try:
+            appareils = get_all_appareils()
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible de charger les appareils :\n{e}")
+            return
+
+        if not appareils:
+            messagebox.showinfo("Information", "Aucun appareil enregistré.\nAjoutez des appareils d'abord.")
+            return
+
+        resultat = simuler_journee(appareils)
+
+        if resultat.get("erreur"):
+            messagebox.showerror("Erreur", resultat["erreur"])
+            return
+
+        container = self._result_container
+
+        # --- Statut global ---
+        statut = resultat["statut"]
+        statut_info = {
+            "OK": ("✅ Système correctement dimensionné", COLORS["success"]),
+            "INSUFFISANT": ("❌ Batterie insuffisante pour la nuit", COLORS["danger"]),
+            "ATTENTION": ("⚠️ " + resultat["message"], COLORS["warning"]),
+        }
+        msg, color = statut_info.get(statut, ("❓ Inconnu", COLORS["text_muted"]))
+
+        status_card = tk.Frame(container, bg=color, highlightbackground=color, highlightthickness=2)
+        status_card.pack(fill=tk.X, padx=30, pady=(10, 5))
+        tk.Label(status_card, text=msg, font=self.font_heading,
+                 bg=color, fg="white").pack(padx=15, pady=10)
+
+        # --- Cartes métriques principales ---
+        metrics_frame = tk.Frame(container, bg=COLORS["bg_dark"])
+        metrics_frame.pack(fill=tk.X, padx=30, pady=10)
+        metrics_frame.columnconfigure((0, 1, 2, 3), weight=1)
+
+        metrics = [
+            ("☀️", "Panneau requis", formater_puissance(resultat["panneau_puissance_w"]), COLORS["solar_yellow"]),
+            ("🔋", "Batterie requise", formater_energie(resultat["batterie_capacite_wh"]), COLORS["battery_green"]),
+            ("📊", "Conso. Jour", formater_energie(resultat["energie_jour_wh"]), COLORS["solar_orange"]),
+            ("🌙", "Conso. Nuit", formater_energie(resultat["energie_nuit_wh"]), COLORS["battery_blue"]),
+        ]
+
+        for i, (icon, label, value, c) in enumerate(metrics):
+            card = self._make_stat_card(metrics_frame, icon, label, value, c)
+            card.grid(row=0, column=i, padx=8, pady=5, sticky="nsew")
+
+        # --- Détail sections ---
+        sections = [
+            ("📊  Consommation Énergétique", [
+                ("Énergie jour (matin + 50% soir)", formater_energie(resultat["energie_jour_wh"])),
+                ("Énergie nuit (nuit + 50% soir)", formater_energie(resultat["energie_nuit_wh"])),
+                ("Énergie totale", formater_energie(resultat["energie_totale_wh"])),
+            ]),
+            ("🕒  Détail par Tranche", [
+                (f"{t.capitalize()}", formater_energie(v))
+                for t, v in resultat["detail_tranches"].items()
+            ]),
+            ("🔋  Batterie", [
+                ("Capacité nécessaire (avec marge +50%)", formater_energie(resultat["batterie_capacite_wh"])),
+                ("Autonomie nuit", "✅ OK" if resultat["batterie_autonomie_ok"] else "❌ Insuffisante"),
+                ("Marge de sécurité", f"{resultat['batterie_marge_pct']}%"),
+            ]),
+            ("☀️  Panneaux Solaires", [
+                ("Puissance nécessaire (nominale)", formater_puissance(resultat["panneau_puissance_w"])),
+                ("Production réelle (40%)", formater_puissance(resultat["panneau_production_reelle_w"])),
+                ("Production journalière", formater_energie(resultat["panneau_production_journaliere_wh"])),
+            ]),
+            ("🔄  Recharge Batterie", [
+                ("Puissance disponible recharge", formater_puissance(resultat["puissance_recharge_w"])),
+                ("Temps de recharge estimé", f"{resultat['temps_recharge_h']:.1f} h" if resultat["temps_recharge_h"] else "∞ (impossible)"),
+                ("Batterie chargée avant 17h", "✅ OUI" if resultat["recharge_ok"] else "❌ NON"),
+            ]),
+        ]
+
+        for title, rows in sections:
+            card = tk.Frame(container, bg=COLORS["bg_card"],
+                            highlightbackground=COLORS["border"], highlightthickness=1)
+            card.pack(fill=tk.X, padx=30, pady=5)
+
+            tk.Label(card, text=title, font=self.font_subheading,
+                     bg=COLORS["bg_card"], fg=COLORS["solar_yellow"],
+                     anchor="w").pack(fill=tk.X, padx=15, pady=(10, 5))
+
+            for label, value in rows:
+                row_frame = tk.Frame(card, bg=COLORS["bg_card"])
+                row_frame.pack(fill=tk.X, padx=15, pady=2)
+                tk.Label(row_frame, text=label, font=self.font_body,
+                         bg=COLORS["bg_card"], fg=COLORS["text_secondary"],
+                         anchor="w").pack(side=tk.LEFT)
+                tk.Label(row_frame, text=value, font=self.font_body,
+                         bg=COLORS["bg_card"], fg=COLORS["text_primary"],
+                         anchor="e").pack(side=tk.RIGHT)
+
+            # petit padding en bas
+            tk.Frame(card, bg=COLORS["bg_card"], height=8).pack()
+
+        # --- Sauvegarder ---
+        try:
+            save_resultat(
+                resultat["energie_jour_wh"],
+                resultat["energie_nuit_wh"],
+                resultat["batterie_capacite_wh"],
+                resultat["panneau_puissance_w"]
+            )
+            save_label = tk.Label(container, text="💾  Résultat sauvegardé dans l'historique",
+                                  font=self.font_small, bg=COLORS["bg_dark"],
+                                  fg=COLORS["success"])
+            save_label.pack(pady=10)
+        except Exception:
+            pass
+
+    # ------------------------------------------
+    # PAGE: Historique
+    # ------------------------------------------
+    def _page_historique(self):
+        """Tableau de l'historique des simulations."""
+        self._make_header(self.main_area, "Historique", "Résultats des simulations précédentes")
+
+        tree_frame = tk.Frame(self.main_area, bg=COLORS["bg_dark"])
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=30, pady=(0, 20))
+
+        columns = ("id", "e_jour", "e_nuit", "batterie", "panneau", "date")
+        tree = ttk.Treeview(tree_frame, columns=columns, show="headings",
+                            style="Dark.Treeview", selectmode="browse")
+
+        headers = {
+            "id": ("ID", 50),
+            "e_jour": ("Énergie Jour (Wh)", 140),
+            "e_nuit": ("Énergie Nuit (Wh)", 140),
+            "batterie": ("Batterie (Wh)", 130),
+            "panneau": ("Panneau (W)", 120),
+            "date": ("Date", 160),
+        }
+        for col, (text, width) in headers.items():
+            tree.heading(col, text=text)
+            tree.column(col, width=width, anchor="center")
+
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=tree.yview,
+                                  style="Dark.Vertical.TScrollbar")
+        tree.configure(yscrollcommand=scrollbar.set)
+
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Charger données
+        try:
+            resultats = get_all_resultats()
+            for r in resultats:
+                date_str = r[5].strftime("%d/%m/%Y %H:%M") if r[5] else "N/A"
+                tree.insert("", tk.END, values=(
+                    r[0], f"{r[1]:.1f}", f"{r[2]:.1f}",
+                    f"{r[3]:.1f}", f"{r[4]:.1f}", date_str
+                ))
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible de charger l'historique :\n{e}")
+
+        # Bouton rafraîchir
+        btn_frame = tk.Frame(self.main_area, bg=COLORS["bg_dark"])
+        btn_frame.pack(fill=tk.X, padx=30, pady=(0, 15))
+        self._make_button(btn_frame, "🔄  Rafraîchir",
+                          lambda: self.show_page("historique"),
+                          color=COLORS["battery_blue"], width=15).pack(anchor="w")
+
+
+# ==========================================
+# Point d'entrée
+# ==========================================
+if __name__ == "__main__":
+    app = SolaireApp()
+    app.mainloop()
