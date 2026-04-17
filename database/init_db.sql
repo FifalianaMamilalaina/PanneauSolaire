@@ -1,8 +1,8 @@
 -- =============================================================
 -- Script d'initialisation de la base de données SolaireDB
+-- Version 2 : heure_debut / heure_fin au lieu de duree_h
 -- =============================================================
 
--- Créer la base de données si elle n'existe pas
 IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'SolaireDB')
 BEGIN
     CREATE DATABASE SolaireDB;
@@ -12,19 +12,24 @@ GO
 USE SolaireDB;
 GO
 
--- =============================================================
--- Table : appareils
--- =============================================================
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'appareils')
+-- Supprimer l'ancienne table si elle existe (pour migration)
+IF EXISTS (SELECT * FROM sys.tables WHERE name = 'appareils')
 BEGIN
-    CREATE TABLE appareils (
-        id INT PRIMARY KEY IDENTITY(1,1),
-        nom VARCHAR(100) NOT NULL,
-        puissance_w FLOAT NOT NULL,
-        duree_h FLOAT NOT NULL,
-        tranche VARCHAR(20) NOT NULL CHECK (tranche IN ('matin', 'soir', 'nuit'))
-    );
+    DROP TABLE appareils;
 END
+GO
+
+-- =============================================================
+-- Table : appareils (v2 avec heure_debut et heure_fin)
+-- =============================================================
+CREATE TABLE appareils (
+    id INT PRIMARY KEY IDENTITY(1,1),
+    nom VARCHAR(100) NOT NULL,
+    puissance_w FLOAT NOT NULL,
+    heure_debut INT NOT NULL CHECK (heure_debut >= 0 AND heure_debut <= 23),
+    heure_fin INT NOT NULL CHECK (heure_fin >= 0 AND heure_fin <= 23),
+    tranche VARCHAR(20) NOT NULL CHECK (tranche IN ('matin', 'soir', 'nuit'))
+);
 GO
 
 -- =============================================================
@@ -46,16 +51,13 @@ GO
 -- =============================================================
 -- Données d'exemple
 -- =============================================================
-IF NOT EXISTS (SELECT 1 FROM appareils)
-BEGIN
-    INSERT INTO appareils (nom, puissance_w, duree_h, tranche) VALUES
-        ('Lampe salon', 15, 5, 'nuit'),
-        ('Lampe chambre', 10, 4, 'nuit'),
-        ('Ventilateur', 50, 8, 'matin'),
-        ('Réfrigérateur', 100, 11, 'matin'),
-        ('Télévision', 80, 3, 'nuit'),
-        ('Chargeur téléphone', 10, 2, 'matin'),
-        ('Radio', 15, 6, 'matin'),
-        ('Lampe extérieure', 20, 2, 'soir');
-END
+INSERT INTO appareils (nom, puissance_w, heure_debut, heure_fin, tranche) VALUES
+    ('Lampe salon', 15, 19, 0, 'nuit'),
+    ('Lampe chambre', 10, 20, 0, 'nuit'),
+    ('Ventilateur', 50, 8, 16, 'matin'),
+    ('Réfrigérateur', 100, 6, 17, 'matin'),
+    ('Télévision', 80, 19, 22, 'nuit'),
+    ('Chargeur téléphone', 10, 10, 12, 'matin'),
+    ('Radio', 15, 7, 13, 'matin'),
+    ('Lampe extérieure', 20, 17, 19, 'soir');
 GO

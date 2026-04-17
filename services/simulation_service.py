@@ -1,6 +1,6 @@
 """
 Service de simulation d'une journée complète.
-Supporte Alea 1 (double rendement) et Alea 2 (pic de consommation / convertisseur).
+Supporte Alea 1 (double rendement) et Alea 2 (pic de consommation heure par heure).
 """
 from services.consommation_service import (
     calculer_energie_par_tranche,
@@ -23,13 +23,10 @@ from services.panneau_service import (
 from config import HEURES_SOLEIL, RENDEMENT_PANNEAU, MARGE_BATTERIE
 
 
-def _simuler_avec_rendement(appareils, rendement, energie_jour, energie_nuit, 
+def _simuler_avec_rendement(appareils, rendement, energie_jour, energie_nuit,
                              energie_totale, energies_tranche, capacite_batterie):
     """
     Effectue le calcul panneau + recharge pour un rendement donné.
-    
-    Returns:
-        dict: Résultat partiel (panneau + recharge) pour ce rendement
     """
     puissance_panneau = calculer_puissance_panneau(
         energie_jour, energie_nuit, rendement=rendement
@@ -58,55 +55,57 @@ def _simuler_avec_rendement(appareils, rendement, energie_jour, energie_nuit,
 
 def calculer_pic_consommation(appareils):
     """
-    Alea 2 : Calcule le pic de consommation (puissance maximale simultanée).
+    Alea 2 : Calcule le pic de consommation heure par heure.
     
-    Pour chaque tranche horaire, on additionne la puissance de tous les appareils
-    qui fonctionnent en même temps. Le pic = la tranche avec la somme la plus élevée.
+    Pour chaque heure (0-23), on additionne la puissance de tous les appareils
+    actifs à cette heure. Le pic = l'heure avec la somme la plus élevée.
     Le convertisseur doit être dimensionné à pic × 2.
     
     Returns:
-        dict: {
-            'pic_w': puissance max,
-            'tranche_pic': la tranche du pic,
-            'convertisseur_w': pic × 2,
-            'detail_par_tranche': {tranche: puissance_totale}
-        }
+        dict avec pic, convertisseur, heure du pic, détail heure par heure,
+              et liste des appareils actifs au moment du pic
     """
-    par_tranche = separer_par_tranche(appareils)
+    # Calcul heure par heure
+    detail_par_heure = {}
+    appareils_par_heure = {}
 
-    detail = {}
-    for tranche, apps in par_tranche.items():
-        puissance_totale = sum(a.puissance_w for a in apps)
-        detail[tranche] = round(puissance_totale, 2)
+    for h in range(24):
+        actifs = [a for a in appareils if a.est_actif_a(h)]
+        puissance_totale = sum(a.puissance_w for a in actifs)
+        detail_par_heure[h] = round(puissance_totale, 2)
+        appareils_par_heure[h] = actifs
 
-    if not detail:
+    if not detail_par_heure:
         return {
             "pic_w": 0,
-            "tranche_pic": "N/A",
+            "heure_pic": 0,
             "convertisseur_w": 0,
-            "detail_par_tranche": {}
+            "detail_par_heure": {},
+            "appareils_pic": []
         }
 
-    tranche_pic = max(detail, key=detail.get)
-    pic = detail[tranche_pic]
+    # Trouver le pic
+    heure_pic = max(detail_par_heure, key=lambda h: detail_par_heure[h])
+    pic = detail_par_heure[heure_pic]
+
+    # Appareils actifs au moment du pic
+    appareils_pic = [
+        {"nom": a.nom, "puissance_w": a.puissance_w, "horaire": f"{a.heure_debut}h->{a.heure_fin}h"}
+        for a in appareils_par_heure[heure_pic]
+    ]
 
     return {
         "pic_w": round(pic, 2),
-        "tranche_pic": tranche_pic,
+        "heure_pic": heure_pic,
         "convertisseur_w": round(pic * 2, 2),
-        "detail_par_tranche": detail
+        "detail_par_heure": detail_par_heure,
+        "appareils_pic": appareils_pic
     }
 
 
 def simuler_journee(appareils):
     """
-    Simule une journée complète avec Alea 1 (double rendement) et Alea 2 (pic/convertisseur).
-    
-    Args:
-        appareils: Liste d'objets Appareil
-    
-    Returns:
-        dict: Résultat complet de la simulation avec toutes les métriques
+    Simule une journée complète avec Alea 1 et Alea 2.
     """
     if not appareils:
         return {
@@ -134,13 +133,12 @@ def simuler_journee(appareils):
         )
         alea1_resultats.append(res)
 
-    # Utiliser le rendement 40% comme référence principale
-    ref = alea1_resultats[0]
+    ref = alea1_resultats[0]  # Référence = 40%
 
-    # --- 4. Alea 2 : Pic de consommation / Convertisseur ---
+    # --- 4. Alea 2 : Pic de consommation heure par heure ---
     alea2 = calculer_pic_consommation(appareils)
 
-    # --- 5. Statut global (basé sur rendement 40%) ---
+    # --- 5. Statut global ---
     if autonomie_ok and ref["recharge_ok"]:
         statut = "OK"
         message = "Le système est correctement dimensionné."
@@ -155,7 +153,6 @@ def simuler_journee(appareils):
         else:
             message = "Impossible de recharger la batterie (puissance insuffisante)."
 
-    # --- 6. Détail par tranche ---
     par_tranche = separer_par_tranche(appareils)
 
     return {
@@ -166,9 +163,7 @@ def simuler_journee(appareils):
         "energie_jour_wh": round(energie_jour, 2),
         "energie_nuit_wh": round(energie_nuit, 2),
         "energie_totale_wh": round(energie_totale, 2),
-        "detail_tranches": {
-            k: round(v, 2) for k, v in energies_tranche.items()
-        },
+        "detail_tranches": {k: round(v, 2) for k, v in energies_tranche.items()},
 
         # Batterie
         "batterie_capacite_wh": round(capacite_batterie, 2),
@@ -185,15 +180,15 @@ def simuler_journee(appareils):
         "temps_recharge_h": ref["temps_recharge_h"],
         "recharge_ok": ref["recharge_ok"],
 
-        # Appareils par tranche
+        # Appareils
         "appareils_matin": len(par_tranche.get("matin", [])),
         "appareils_soir": len(par_tranche.get("soir", [])),
         "appareils_nuit": len(par_tranche.get("nuit", [])),
         "nb_appareils_total": len(appareils),
 
-        # === ALEA 1 : Comparaison rendements ===
+        # ALEA 1
         "alea1": alea1_resultats,
 
-        # === ALEA 2 : Pic consommation / Convertisseur ===
+        # ALEA 2
         "alea2": alea2,
     }

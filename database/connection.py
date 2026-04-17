@@ -66,7 +66,8 @@ def init_database():
                 id INT PRIMARY KEY IDENTITY(1,1),
                 nom VARCHAR(100) NOT NULL,
                 puissance_w FLOAT NOT NULL,
-                duree_h FLOAT NOT NULL,
+                heure_debut INT NOT NULL CHECK (heure_debut >= 0 AND heure_debut <= 23),
+                heure_fin INT NOT NULL CHECK (heure_fin >= 0 AND heure_fin <= 23),
                 tranche VARCHAR(20) NOT NULL CHECK (tranche IN ('matin', 'soir', 'nuit'))
             );
         END

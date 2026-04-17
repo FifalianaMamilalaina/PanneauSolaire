@@ -357,22 +357,46 @@ class SolaireApp(tk.Tk):
         # Champs
         self._entry_nom = self._make_entry(card, "Nom de l'appareil :", 0)
         self._entry_puissance = self._make_entry(card, "Puissance (W) :", 1)
-        self._entry_duree = self._make_entry(card, "Durée d'utilisation (h) :", 2)
 
-        # Tranche (ComboBox)
-        tk.Label(card, text="Tranche horaire :", font=self.font_body,
+        # Heure début (Spinbox 0-23)
+        tk.Label(card, text="Heure de début (0-23) :", font=self.font_body,
+                 bg=COLORS["bg_card"], fg=COLORS["text_secondary"]).grid(
+            row=2, column=0, sticky="w", padx=15, pady=8)
+
+        self._spin_debut = tk.Spinbox(card, from_=0, to=23, width=5,
+                                       font=self.font_body,
+                                       bg=COLORS["bg_input"], fg=COLORS["text_primary"],
+                                       insertbackground=COLORS["text_primary"],
+                                       relief="flat", highlightthickness=1,
+                                       highlightbackground=COLORS["border"],
+                                       highlightcolor=COLORS["solar_yellow"])
+        self._spin_debut.grid(row=2, column=1, sticky="w", padx=(5, 15), pady=8, ipady=4)
+
+        # Heure fin (Spinbox 0-23)
+        tk.Label(card, text="Heure de fin (0-23) :", font=self.font_body,
                  bg=COLORS["bg_card"], fg=COLORS["text_secondary"]).grid(
             row=3, column=0, sticky="w", padx=15, pady=8)
 
-        self._combo_tranche = ttk.Combobox(card, font=self.font_body,
-                                           state="readonly",
-                                           values=["matin (06h → 17h)", "soir (17h → 19h)", "nuit (19h → 06h)"])
-        self._combo_tranche.set("matin (06h → 17h)")
-        self._combo_tranche.grid(row=3, column=1, sticky="ew", padx=(5, 15), pady=8, ipady=4)
+        self._spin_fin = tk.Spinbox(card, from_=0, to=23, width=5,
+                                     font=self.font_body,
+                                     bg=COLORS["bg_input"], fg=COLORS["text_primary"],
+                                     insertbackground=COLORS["text_primary"],
+                                     relief="flat", highlightthickness=1,
+                                     highlightbackground=COLORS["border"],
+                                     highlightcolor=COLORS["solar_yellow"])
+        self._spin_fin.grid(row=3, column=1, sticky="w", padx=(5, 15), pady=8, ipady=4)
+
+        # Info tranche (auto-déduite)
+        info_frame = tk.Frame(card, bg=COLORS["bg_card"])
+        info_frame.grid(row=4, column=0, columnspan=2, padx=15, pady=5)
+        tk.Label(info_frame, text="ℹ️  La tranche horaire est déduite automatiquement : "
+                 "Matin (6h-17h) | Soir (17h-19h) | Nuit (19h-6h)",
+                 font=self.font_small, bg=COLORS["bg_card"],
+                 fg=COLORS["text_muted"], wraplength=500).pack()
 
         # Bouton ajouter
         btn_frame = tk.Frame(card, bg=COLORS["bg_card"])
-        btn_frame.grid(row=4, column=0, columnspan=2, pady=15)
+        btn_frame.grid(row=5, column=0, columnspan=2, pady=15)
 
         self._make_button(btn_frame, "✅  Ajouter l'appareil",
                           self._action_ajouter,
@@ -387,8 +411,8 @@ class SolaireApp(tk.Tk):
         """Action du bouton Ajouter."""
         nom = self._entry_nom.get().strip()
         puissance_str = self._entry_puissance.get().strip()
-        duree_str = self._entry_duree.get().strip()
-        tranche_raw = self._combo_tranche.get()
+        debut_str = self._spin_debut.get().strip()
+        fin_str = self._spin_fin.get().strip()
 
         if not nom:
             messagebox.showwarning("Champ manquant", "Le nom de l'appareil est requis.")
@@ -396,28 +420,40 @@ class SolaireApp(tk.Tk):
 
         try:
             puissance = float(puissance_str)
-            duree = float(duree_str)
         except ValueError:
-            messagebox.showwarning("Valeur invalide", "La puissance et la durée doivent être des nombres.")
+            messagebox.showwarning("Valeur invalide", "La puissance doit être un nombre.")
             return
 
-        if puissance <= 0 or duree <= 0:
-            messagebox.showwarning("Valeur invalide", "La puissance et la durée doivent être positives.")
+        if puissance <= 0:
+            messagebox.showwarning("Valeur invalide", "La puissance doit être positive.")
             return
-
-        tranche = tranche_raw.split(" ")[0]  # "matin (06h..." → "matin"
 
         try:
-            insert_appareil(nom, puissance, duree, tranche)
-            energie = puissance * duree
+            heure_debut = int(debut_str)
+            heure_fin = int(fin_str)
+        except ValueError:
+            messagebox.showwarning("Valeur invalide", "Les heures doivent être des entiers (0-23).")
+            return
+
+        if not (0 <= heure_debut <= 23) or not (0 <= heure_fin <= 23):
+            messagebox.showwarning("Valeur invalide", "Les heures doivent être entre 0 et 23.")
+            return
+
+        try:
+            insert_appareil(nom, puissance, heure_debut, heure_fin)
+            from models.appareil import Appareil
+            a = Appareil(nom, puissance, heure_debut, heure_fin)
             self._label_message.config(
-                text=f"✅ '{nom}' ajouté — {puissance}W × {duree}h = {energie} Wh [{tranche}]",
+                text=f"✅ '{nom}' ajouté — {puissance}W, {heure_debut}h→{heure_fin}h "
+                     f"({a.duree_h()}h) = {a.energie_wh()} Wh [{a.tranche}]",
                 fg=COLORS["success"])
             # Vider les champs
             self._entry_nom.delete(0, tk.END)
             self._entry_puissance.delete(0, tk.END)
-            self._entry_duree.delete(0, tk.END)
-            self._combo_tranche.set("matin (06h → 17h)")
+            self._spin_debut.delete(0, tk.END)
+            self._spin_debut.insert(0, "0")
+            self._spin_fin.delete(0, tk.END)
+            self._spin_fin.insert(0, "0")
         except Exception as e:
             messagebox.showerror("Erreur", f"Impossible d'ajouter l'appareil :\n{e}")
 
@@ -432,17 +468,18 @@ class SolaireApp(tk.Tk):
         tree_frame = tk.Frame(self.main_area, bg=COLORS["bg_dark"])
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=30, pady=(0, 10))
 
-        columns = ("id", "nom", "puissance", "duree", "energie", "tranche")
+        columns = ("id", "nom", "puissance", "horaire", "duree", "energie", "tranche")
         self._tree = ttk.Treeview(tree_frame, columns=columns, show="headings",
                                   style="Dark.Treeview", selectmode="browse")
 
         headers = {
             "id": ("ID", 50),
-            "nom": ("Nom", 200),
-            "puissance": ("Puissance (W)", 120),
-            "duree": ("Durée (h)", 100),
-            "energie": ("Énergie (Wh)", 120),
-            "tranche": ("Tranche", 100),
+            "nom": ("Nom", 180),
+            "puissance": ("Puissance (W)", 110),
+            "horaire": ("Horaire", 100),
+            "duree": ("Durée (h)", 80),
+            "energie": ("Énergie (Wh)", 110),
+            "tranche": ("Tranche", 80),
         }
         for col, (text, width) in headers.items():
             self._tree.heading(col, text=text)
@@ -478,8 +515,9 @@ class SolaireApp(tk.Tk):
             appareils = get_all_appareils()
             for a in appareils:
                 self._tree.insert("", tk.END, values=(
-                    a.id, a.nom, f"{a.puissance_w:.1f}", f"{a.duree_h:.1f}",
-                    f"{a.energie_wh():.1f}", a.tranche
+                    a.id, a.nom, f"{a.puissance_w:.1f}",
+                    f"{a.heure_debut}h→{a.heure_fin}h",
+                    f"{a.duree_h()}", f"{a.energie_wh():.1f}", a.tranche
                 ))
         except Exception as e:
             messagebox.showerror("Erreur", f"Impossible de charger les appareils :\n{e}")
@@ -722,7 +760,7 @@ class SolaireApp(tk.Tk):
                      font=self.font_heading, bg=COLORS["bg_dark"],
                      fg=COLORS["battery_blue"]).pack(anchor="w")
             tk.Label(alea2_header,
-                     text="Pic = puissance max simultanée par tranche | Convertisseur = Pic × 2",
+                     text="Pic = puissance max simultanée (heure par heure) | Convertisseur = Pic × 2",
                      font=self.font_small, bg=COLORS["bg_dark"],
                      fg=COLORS["text_muted"]).pack(anchor="w")
 
@@ -745,40 +783,77 @@ class SolaireApp(tk.Tk):
             )
             conv_card.grid(row=0, column=1, padx=8, pady=5, sticky="nsew")
 
-            tranche_card = self._make_stat_card(
-                alea2_metrics, "🕒", "Tranche du pic",
-                alea2["tranche_pic"].capitalize(),
+            heure_pic = alea2["heure_pic"]
+            heure_card = self._make_stat_card(
+                alea2_metrics, "🕒", "Heure du pic",
+                f"{heure_pic}h",
                 COLORS["solar_orange"]
             )
-            tranche_card.grid(row=0, column=2, padx=8, pady=5, sticky="nsew")
+            heure_card.grid(row=0, column=2, padx=8, pady=5, sticky="nsew")
 
-            # Détail par tranche
-            detail_card = tk.Frame(container, bg=COLORS["bg_card"],
+            # Appareils actifs au moment du pic
+            if alea2.get("appareils_pic"):
+                pic_detail_card = tk.Frame(container, bg=COLORS["bg_card"],
+                                           highlightbackground=COLORS["danger"],
+                                           highlightthickness=1)
+                pic_detail_card.pack(fill=tk.X, padx=30, pady=5)
+
+                tk.Label(pic_detail_card,
+                         text=f"⚡  Appareils actifs à {heure_pic}h (chevauchement)",
+                         font=self.font_subheading, bg=COLORS["bg_card"],
+                         fg=COLORS["danger"]).pack(fill=tk.X, padx=15, pady=(10, 5))
+
+                for ap in alea2["appareils_pic"]:
+                    row_frame = tk.Frame(pic_detail_card, bg=COLORS["bg_card"])
+                    row_frame.pack(fill=tk.X, padx=15, pady=2)
+                    tk.Label(row_frame, text=f"  {ap['nom']}  ({ap['horaire']})",
+                             font=self.font_body, bg=COLORS["bg_card"],
+                             fg=COLORS["text_secondary"], anchor="w").pack(side=tk.LEFT)
+                    tk.Label(row_frame, text=formater_puissance(ap["puissance_w"]),
+                             font=self.font_body, bg=COLORS["bg_card"],
+                             fg=COLORS["text_primary"], anchor="e").pack(side=tk.RIGHT)
+
+                tk.Frame(pic_detail_card, bg=COLORS["bg_card"], height=10).pack()
+
+            # Graphe heure par heure (texte)
+            hourly_card = tk.Frame(container, bg=COLORS["bg_card"],
                                    highlightbackground=COLORS["battery_blue"],
                                    highlightthickness=1)
-            detail_card.pack(fill=tk.X, padx=30, pady=5)
+            hourly_card.pack(fill=tk.X, padx=30, pady=5)
 
-            tk.Label(detail_card, text="⚡  Puissance simultanée par tranche",
+            tk.Label(hourly_card, text="📊  Puissance totale heure par heure",
                      font=self.font_subheading, bg=COLORS["bg_card"],
                      fg=COLORS["battery_blue"]).pack(fill=tk.X, padx=15, pady=(10, 5))
 
-            for tranche, puissance in alea2["detail_par_tranche"].items():
-                row_frame = tk.Frame(detail_card, bg=COLORS["bg_card"])
-                row_frame.pack(fill=tk.X, padx=15, pady=3)
+            detail_heure = alea2.get("detail_par_heure", {})
+            max_p = max(detail_heure.values()) if detail_heure else 1
+            bar_max_width = 30  # chars
 
-                is_pic = (tranche == alea2["tranche_pic"])
-                fg_color = COLORS["danger"] if is_pic else COLORS["text_secondary"]
-                suffix = "  ◀ PIC" if is_pic else ""
+            for h in range(24):
+                p = detail_heure.get(h, 0)
+                if p == 0:
+                    continue
 
-                tk.Label(row_frame, text=f"{tranche.capitalize()} (tous appareils simultanés)",
-                         font=self.font_body, bg=COLORS["bg_card"],
-                         fg=fg_color, anchor="w").pack(side=tk.LEFT)
-                tk.Label(row_frame,
-                         text=f"{formater_puissance(puissance)}{suffix}",
-                         font=self.font_body, bg=COLORS["bg_card"],
-                         fg=fg_color, anchor="e").pack(side=tk.RIGHT)
+                row_frame = tk.Frame(hourly_card, bg=COLORS["bg_card"])
+                row_frame.pack(fill=tk.X, padx=15, pady=1)
 
-            tk.Frame(detail_card, bg=COLORS["bg_card"], height=10).pack()
+                is_pic = (h == heure_pic)
+                fg = COLORS["danger"] if is_pic else COLORS["text_secondary"]
+                bar_len = int((p / max_p) * bar_max_width) if max_p > 0 else 0
+                bar = "█" * bar_len
+                marker = " ◀ PIC" if is_pic else ""
+
+                tk.Label(row_frame, text=f"{h:2d}h", font=("Consolas", 9),
+                         bg=COLORS["bg_card"], fg=fg, width=4,
+                         anchor="e").pack(side=tk.LEFT)
+                tk.Label(row_frame, text=f" {bar}", font=("Consolas", 9),
+                         bg=COLORS["bg_card"], fg=COLORS["solar_yellow"] if not is_pic else COLORS["danger"],
+                         anchor="w").pack(side=tk.LEFT)
+                tk.Label(row_frame, text=f" {formater_puissance(p)}{marker}",
+                         font=("Consolas", 9), bg=COLORS["bg_card"],
+                         fg=fg, anchor="w").pack(side=tk.LEFT)
+
+            tk.Frame(hourly_card, bg=COLORS["bg_card"], height=10).pack()
 
         # --- Sauvegarder ---
         try:
