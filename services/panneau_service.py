@@ -1,10 +1,11 @@
 """
 Service de calcul des panneaux solaires.
+Supporte un rendement paramétrable pour les simulations Alea.
 """
 from config import RENDEMENT_PANNEAU, HEURES_SOLEIL
 
 
-def calculer_puissance_panneau(energie_jour_wh, energie_nuit_wh, heures_soleil=None):
+def calculer_puissance_panneau(energie_jour_wh, energie_nuit_wh, heures_soleil=None, rendement=None):
     """
     Calcule la puissance nécessaire des panneaux solaires.
     
@@ -18,28 +19,33 @@ def calculer_puissance_panneau(energie_jour_wh, energie_nuit_wh, heures_soleil=N
         energie_jour_wh: Énergie consommée le jour en Wh
         energie_nuit_wh: Énergie consommée la nuit en Wh
         heures_soleil: Heures d'ensoleillement (défaut: config.HEURES_SOLEIL)
+        rendement: Rendement du panneau (défaut: config.RENDEMENT_PANNEAU)
     
     Returns:
         float: Puissance panneau nécessaire en W
     """
     if heures_soleil is None:
         heures_soleil = HEURES_SOLEIL
+    if rendement is None:
+        rendement = RENDEMENT_PANNEAU
 
     besoin_total = energie_jour_wh + energie_nuit_wh
-    return besoin_total / (heures_soleil * RENDEMENT_PANNEAU)
+    return besoin_total / (heures_soleil * rendement)
 
 
-def production_reelle(puissance_panneau_w):
+def production_reelle(puissance_panneau_w, rendement=None):
     """
-    Calcule la production réelle d'un panneau (rendement 40%).
+    Calcule la production réelle d'un panneau.
     
     Returns:
         float: Puissance réelle en W
     """
-    return puissance_panneau_w * RENDEMENT_PANNEAU
+    if rendement is None:
+        rendement = RENDEMENT_PANNEAU
+    return puissance_panneau_w * rendement
 
 
-def production_journaliere(puissance_panneau_w, heures_soleil=None):
+def production_journaliere(puissance_panneau_w, heures_soleil=None, rendement=None):
     """
     Calcule la production journalière totale d'un panneau.
     
@@ -49,14 +55,14 @@ def production_journaliere(puissance_panneau_w, heures_soleil=None):
     if heures_soleil is None:
         heures_soleil = HEURES_SOLEIL
 
-    return production_reelle(puissance_panneau_w) * heures_soleil
+    return production_reelle(puissance_panneau_w, rendement) * heures_soleil
 
 
-def puissance_disponible_recharge(puissance_panneau_w, consommation_w):
+def puissance_disponible_recharge(puissance_panneau_w, consommation_w, rendement=None):
     """
     Calcule la puissance disponible pour recharger la batterie.
     
     Returns:
         float: Puissance excédentaire en W (peut être négative si insuffisant)
     """
-    return production_reelle(puissance_panneau_w) - consommation_w
+    return production_reelle(puissance_panneau_w, rendement) - consommation_w

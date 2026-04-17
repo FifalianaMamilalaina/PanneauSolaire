@@ -1,0 +1,44 @@
+Objectif : appareil exemple ordi , 65 watt de 10h a 12h , frigo 800 watt 8h a 11h : modelisation input 
+output : mamoka paneau en watt : puissance avoka en watt de batterie en wattheure , puissance en watt estimer par tranceh
+3 tranches : AM:matin:6h a 17h  fin d aprem midi PM 17 h a 19 h , nuit : 19h a 6 h du matn 
+autre exemple : tv 65 watt 17 h A 18 h ; manana ligne 1 6h a 19H de manana an;le 17 h de ke ordi de 10 a 12 h io ato
+misy consommation 65 watt de le 8 a 11 manana puissance 800 whatt vu que reo mifappchevauche mamana puissance 865 watt zany tsika
+necessite besoin grand B , besoin zn tojn dispo am,le panneau nefa on a aussi la tc qui marche jusuq a 18 h tv 65 whatt rerf 65 watt comparetsika
+notion poanneau raha 100 marina de 50 our100 miasa amn alina , de le 100 pou100 le 865 avadika disponible temporaire de diviena par2
+865/2 432,5 satria 100 no omen le panenu de ati 50 ihany d raha dispo temporairement 865 de miena 50 pourcent de 432,5 zany dispo tempo de jerena we
+io v maafeno besoin anle 65 what raha maafeno de 65 whatt ian n ato de 865 ihany n ato , raha oatra we manana app de mila 865 whatt panneau 
+de reef midina n masoandro de miena n puissance panneau satria puissance tempotaire 865 no ilaina de raha iny n ampiasaiko 
+de tonga n alina de 50° pour100 sisa n puissnace panneau , de le 432 watt v maafeno besoin 65 whatt amle ariva io , de raha tsy mafeno izy
+oatra 500 n app amn hariva de we ay 432 le hariva sisa de on a qu a prner 500 whatt de raha 50 poir100 no 500 what de 100 pour100 zany 1000
+de puissnane panneau omenao zany 1000 what . 
+
+zay le panneau le batterie zao , oatra amalina manana appareil oatra frigo 20 h a 5 h du matin mande 800 whatt , n batterie whattheure nefa
+tv oatra 21 a 22 h , 120 whatt oatra calcul besoin batterie zao duree ato 20 a 5h , de 21 a 22 , de whatteur fa ts whatt
+donc puiss appareil  * herue , 800 whatt * 9 h donc 7200 whattheure ; 1 heure ato de 120 whatt * 1 h , 120 whatteru ; de n whater
+tsy enerdie , tsy inn fa capacite , donc capacite batt ilainao zany 1200 + ... 7320 whatter zn ilaina de n batterie tsy miova n capacité , de reef azo io *de 
+le output batterie jerena de lasa 7320 whatt * 1;5 vu que oz zareo we putput btterie + 50 pourcent donc + 5à pourcent zn valiny
+7320 * 1.5 de maazo 10980 whatter zn ny output fa 7320 no consommenao de le 17320 zany no a charger  
+
+Mananaanle exemple teo tsika zany 6h a 19 h , manana 8h , manana 10 h , mamana 12 h , ma,ana 17h manana 17h , de ato tsika de 8h a
+11 h manana chevauchement 1 de 10 a 12 h chevauchement 1 de ato manana tv de 17 h a 18 h de manana maafeno 500 whatt azy de atao plus ftsh
+de 17 h a 19 htsika on a besoin de 435 , ty A , ty B ty C de D , A 65 B 800 C 65 de D 435 , de le batterie mcharge fona durant la
+journnee du coup de 6 a 18 h mchareg fona donc divise par 12 ? Pk ?? Car de 6 a 17 h mande a 100 le capacite batterie et 17 a 19 h 50 pourcentdonc durant 11 h zany enao 100 pourcent ed durant 2h 50 poucent 
+50 pour100 2 h zn 1H , donc n 2 h amle 17 a 19 h equivaut 1 h an,le 6 h a 17 h . pour calcul batteire reciproquement an fomba iconsommena anle batteie no ichargena azy  , de si t as 7320 whatter en batterie tu dois charger pensant 12 h puissance pour chargena azy zany 
+apres calcule : 610 whatt dont on a besoin de nefa io 610 placena am reetra ty de io raha jerena le maimm nalaina de par rapport anle maximun nalaitsika le 1000 mila 610 whatt satria raha 1000 caoacite alainao ato , 
+matonga 610 raha 1000 le capacite mila 1000  de autre mila 500 ato zany enao mila puissance plus de 610 what de zay matonga we /2 610/2 305 le besoin ato zany lasa 805, besoin fa tsy disponible , de 
+le besoin ato zn lasa 1610 de si tu remarques , normalement le 805 io raha atao *2 de tokn manome 1610 satria valeur exact no omena fa tsy misyu marge de nana 12 tsika
+ fa raha tsy 50 pour100 oatra fa 60 de le 11 11 h fpna fa le 2 H = 60 pour100 donc 2 h * 60 POURCENT = 1.2 , lasa 11 + 1.2 = 12.2 au lieu de diviser 7320 what par 12 d lasa 
+7320 WHATTER / 12.2 de lasa 600 donc lasa 600 le ato de 600/2 300 de ato lasa 300 + ... = 800 de ato 1600 ihany de marina fina satria durant le 2 h de 300 omena azy . Output anle panneau zany tsy io ftsn satria io 40 pourcent anle panneau reel donc 1600 whatt io / rendement any donc 1600/0.4 donc tokn 4000 what le panneau ilaina 
+
+Alea 1, avokanao le 0.4 io de mamoka hafa enao 0.3 (si panneau A no amiasaiko de zao n valiny sy 2 de zao n valiny)
+Alea 2 , par rappott anle njeretsika teo de mitady pique enao aiza amle parmi cheufaugement teo we iza n ambony ndrindra de atao *2 de ampidirina amle valeur covertisseur de manana convertisseur zany tsika hoe pique *2
+(ex manana pique tsika 865 n 1 de 65 n 1 de ty n atao *2 de zay n covertisseur amle cheuvauchemet fa na tsis ary fa ty n ngeza ndrundra miasa ndrindra le pannea de in n atao *2 de zay n convertisseur )
+
+
+Alea 1: marge paneau solaire: 40%, on test en meme temps a 40% et a 30%, afficher chaque reponse
+Alea 2: on cherche le pic de consommation et on multiplie par 2, on affiche chaque reponse
+
+on va changer un peu les appareils et les tranches d'heure
+dans la configuration actuelle, si on ajoute un appareil dans la tranche d'heure le matin, dans la configuration actuelle, ca signifie que l'appareil en question fonctionne a 100% du temps dans cette tranche d'heure
+on va ajouter un nouveau champ qui estt durre
+ca definira la durree dans laquelle l'appareil sera utiliser dans cette tranche d'heure pour ne pas qu'il soit utiliser a 100% du temps dans cette ttranche d'heure

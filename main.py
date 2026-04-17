@@ -617,11 +617,6 @@ class SolaireApp(tk.Tk):
                 ("Autonomie nuit", "✅ OK" if resultat["batterie_autonomie_ok"] else "❌ Insuffisante"),
                 ("Marge de sécurité", f"{resultat['batterie_marge_pct']}%"),
             ]),
-            ("☀️  Panneaux Solaires", [
-                ("Puissance nécessaire (nominale)", formater_puissance(resultat["panneau_puissance_w"])),
-                ("Production réelle (40%)", formater_puissance(resultat["panneau_production_reelle_w"])),
-                ("Production journalière", formater_energie(resultat["panneau_production_journaliere_wh"])),
-            ]),
             ("🔄  Recharge Batterie", [
                 ("Puissance disponible recharge", formater_puissance(resultat["puissance_recharge_w"])),
                 ("Temps de recharge estimé", f"{resultat['temps_recharge_h']:.1f} h" if resultat["temps_recharge_h"] else "∞ (impossible)"),
@@ -650,6 +645,140 @@ class SolaireApp(tk.Tk):
 
             # petit padding en bas
             tk.Frame(card, bg=COLORS["bg_card"], height=8).pack()
+
+        # ==========================================================
+        # ALEA 1 : Comparaison rendement 40% vs 30%
+        # ==========================================================
+        alea1 = resultat.get("alea1", [])
+        if alea1:
+            # Titre section
+            tk.Frame(container, bg=COLORS["accent"], height=3).pack(fill=tk.X, padx=30, pady=(20, 0))
+            alea1_header = tk.Frame(container, bg=COLORS["bg_dark"])
+            alea1_header.pack(fill=tk.X, padx=30, pady=(5, 10))
+            tk.Label(alea1_header, text="🎲  ALEA 1 — Comparaison Rendement Panneau",
+                     font=self.font_heading, bg=COLORS["bg_dark"],
+                     fg=COLORS["accent"]).pack(anchor="w")
+            tk.Label(alea1_header, text="Simulation avec deux rendements différents côte à côte",
+                     font=self.font_small, bg=COLORS["bg_dark"],
+                     fg=COLORS["text_muted"]).pack(anchor="w")
+
+            # Cartes côte à côte
+            compare_frame = tk.Frame(container, bg=COLORS["bg_dark"])
+            compare_frame.pack(fill=tk.X, padx=30, pady=5)
+            compare_frame.columnconfigure((0, 1), weight=1)
+
+            colors_alea = [COLORS["solar_yellow"], COLORS["solar_orange"]]
+
+            for i, res in enumerate(alea1):
+                rend_pct = res["rendement_pct"]
+                border_color = colors_alea[i]
+
+                card = tk.Frame(compare_frame, bg=COLORS["bg_card"],
+                                highlightbackground=border_color, highlightthickness=2)
+                card.grid(row=0, column=i, padx=8, pady=5, sticky="nsew")
+
+                # En-tête de la carte
+                header_bg = border_color
+                header_frame = tk.Frame(card, bg=header_bg)
+                header_frame.pack(fill=tk.X)
+                tk.Label(header_frame, text=f"☀️  Rendement {rend_pct}%",
+                         font=self.font_subheading, bg=header_bg,
+                         fg="white").pack(padx=15, pady=8)
+
+                # Données
+                rows_alea = [
+                    ("Puissance panneau", formater_puissance(res["panneau_puissance_w"])),
+                    ("Production réelle", formater_puissance(res["panneau_production_reelle_w"])),
+                    ("Production journalière", formater_energie(res["panneau_production_journaliere_wh"])),
+                    ("Puissance recharge", formater_puissance(res["puissance_recharge_w"])),
+                    ("Temps de recharge",
+                     f"{res['temps_recharge_h']:.1f} h" if res["temps_recharge_h"] else "∞"),
+                    ("Recharge avant 17h",
+                     "✅ OUI" if res["recharge_ok"] else "❌ NON"),
+                ]
+
+                for label, value in rows_alea:
+                    row_frame = tk.Frame(card, bg=COLORS["bg_card"])
+                    row_frame.pack(fill=tk.X, padx=15, pady=3)
+                    tk.Label(row_frame, text=label, font=self.font_body,
+                             bg=COLORS["bg_card"], fg=COLORS["text_secondary"],
+                             anchor="w").pack(side=tk.LEFT)
+                    tk.Label(row_frame, text=value, font=self.font_body,
+                             bg=COLORS["bg_card"], fg=COLORS["text_primary"],
+                             anchor="e").pack(side=tk.RIGHT)
+
+                tk.Frame(card, bg=COLORS["bg_card"], height=10).pack()
+
+        # ==========================================================
+        # ALEA 2 : Pic de consommation / Convertisseur
+        # ==========================================================
+        alea2 = resultat.get("alea2", {})
+        if alea2 and alea2.get("pic_w", 0) > 0:
+            # Titre section
+            tk.Frame(container, bg=COLORS["battery_blue"], height=3).pack(fill=tk.X, padx=30, pady=(20, 0))
+            alea2_header = tk.Frame(container, bg=COLORS["bg_dark"])
+            alea2_header.pack(fill=tk.X, padx=30, pady=(5, 10))
+            tk.Label(alea2_header, text="🎲  ALEA 2 — Pic de Consommation & Convertisseur",
+                     font=self.font_heading, bg=COLORS["bg_dark"],
+                     fg=COLORS["battery_blue"]).pack(anchor="w")
+            tk.Label(alea2_header,
+                     text="Pic = puissance max simultanée par tranche | Convertisseur = Pic × 2",
+                     font=self.font_small, bg=COLORS["bg_dark"],
+                     fg=COLORS["text_muted"]).pack(anchor="w")
+
+            # Cartes principales Alea 2
+            alea2_metrics = tk.Frame(container, bg=COLORS["bg_dark"])
+            alea2_metrics.pack(fill=tk.X, padx=30, pady=5)
+            alea2_metrics.columnconfigure((0, 1, 2), weight=1)
+
+            pic_card = self._make_stat_card(
+                alea2_metrics, "⚡", "Pic de consommation",
+                formater_puissance(alea2["pic_w"]),
+                COLORS["danger"]
+            )
+            pic_card.grid(row=0, column=0, padx=8, pady=5, sticky="nsew")
+
+            conv_card = self._make_stat_card(
+                alea2_metrics, "🔌", "Convertisseur (Pic × 2)",
+                formater_puissance(alea2["convertisseur_w"]),
+                COLORS["accent"]
+            )
+            conv_card.grid(row=0, column=1, padx=8, pady=5, sticky="nsew")
+
+            tranche_card = self._make_stat_card(
+                alea2_metrics, "🕒", "Tranche du pic",
+                alea2["tranche_pic"].capitalize(),
+                COLORS["solar_orange"]
+            )
+            tranche_card.grid(row=0, column=2, padx=8, pady=5, sticky="nsew")
+
+            # Détail par tranche
+            detail_card = tk.Frame(container, bg=COLORS["bg_card"],
+                                   highlightbackground=COLORS["battery_blue"],
+                                   highlightthickness=1)
+            detail_card.pack(fill=tk.X, padx=30, pady=5)
+
+            tk.Label(detail_card, text="⚡  Puissance simultanée par tranche",
+                     font=self.font_subheading, bg=COLORS["bg_card"],
+                     fg=COLORS["battery_blue"]).pack(fill=tk.X, padx=15, pady=(10, 5))
+
+            for tranche, puissance in alea2["detail_par_tranche"].items():
+                row_frame = tk.Frame(detail_card, bg=COLORS["bg_card"])
+                row_frame.pack(fill=tk.X, padx=15, pady=3)
+
+                is_pic = (tranche == alea2["tranche_pic"])
+                fg_color = COLORS["danger"] if is_pic else COLORS["text_secondary"]
+                suffix = "  ◀ PIC" if is_pic else ""
+
+                tk.Label(row_frame, text=f"{tranche.capitalize()} (tous appareils simultanés)",
+                         font=self.font_body, bg=COLORS["bg_card"],
+                         fg=fg_color, anchor="w").pack(side=tk.LEFT)
+                tk.Label(row_frame,
+                         text=f"{formater_puissance(puissance)}{suffix}",
+                         font=self.font_body, bg=COLORS["bg_card"],
+                         fg=fg_color, anchor="e").pack(side=tk.RIGHT)
+
+            tk.Frame(detail_card, bg=COLORS["bg_card"], height=10).pack()
 
         # --- Sauvegarder ---
         try:
