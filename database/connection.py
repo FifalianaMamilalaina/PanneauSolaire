@@ -88,6 +88,20 @@ def init_database():
         END
     """)
 
+    # Table panneaux_solaires (Alea 3)
+    cursor.execute("""
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'panneaux_solaires')
+        BEGIN
+            CREATE TABLE panneaux_solaires (
+                id INT PRIMARY KEY IDENTITY(1,1),
+                nom VARCHAR(100) NOT NULL,
+                energie_unitaire_w FLOAT NOT NULL,
+                pourcentage FLOAT NOT NULL,
+                prix_unitaire FLOAT NOT NULL
+            );
+        END
+    """)
+
     conn.commit()
     cursor.close()
     conn.close()

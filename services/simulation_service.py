@@ -1,6 +1,7 @@
 """
 Service de simulation d'une journée complète.
-Supporte Alea 1 (double rendement) et Alea 2 (pic de consommation heure par heure).
+Supporte Alea 1 (double rendement), Alea 2 (pic de consommation heure par heure),
+et Alea 3 (sélection optimale de panneaux solaires).
 """
 from services.consommation_service import (
     calculer_energie_par_tranche,
@@ -20,6 +21,7 @@ from services.panneau_service import (
     production_journaliere,
     puissance_disponible_recharge
 )
+from services.alea3_service import calculer_options_panneaux
 from config import HEURES_SOLEIL, RENDEMENT_PANNEAU, MARGE_BATTERIE
 
 
@@ -103,9 +105,13 @@ def calculer_pic_consommation(appareils):
     }
 
 
-def simuler_journee(appareils):
+def simuler_journee(appareils, panneaux=None):
     """
-    Simule une journée complète avec Alea 1 et Alea 2.
+    Simule une journée complète avec Alea 1, Alea 2 et Alea 3.
+    
+    Args:
+        appareils: Liste des appareils
+        panneaux: Liste de PanneauSolaire (optionnel, pour Alea 3)
     """
     if not appareils:
         return {
@@ -138,7 +144,13 @@ def simuler_journee(appareils):
     # --- 4. Alea 2 : Pic de consommation heure par heure ---
     alea2 = calculer_pic_consommation(appareils)
 
-    # --- 5. Statut global ---
+    # --- 5. Alea 3 : Sélection de panneaux solaires ---
+    alea3 = []
+    if panneaux:
+        puissance_requise = ref["panneau_puissance_w"]
+        alea3 = calculer_options_panneaux(puissance_requise, panneaux)
+
+    # --- 6. Statut global ---
     if autonomie_ok and ref["recharge_ok"]:
         statut = "OK"
         message = "Le système est correctement dimensionné."
@@ -191,4 +203,7 @@ def simuler_journee(appareils):
 
         # ALEA 2
         "alea2": alea2,
+
+        # ALEA 3
+        "alea3": alea3,
     }

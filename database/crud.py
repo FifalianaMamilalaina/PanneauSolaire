@@ -139,3 +139,58 @@ def get_all_resultats():
     cursor.close()
     conn.close()
     return rows
+
+
+# ==========================================
+# CRUD Panneaux Solaires (Alea 3)
+# ==========================================
+
+def insert_panneau(nom, energie_unitaire_w, pourcentage, prix_unitaire):
+    """Insère un nouveau type de panneau solaire."""
+    from models.panneau_solaire import PanneauSolaire
+    # Valider via le modèle
+    PanneauSolaire(nom, energie_unitaire_w, pourcentage, prix_unitaire)
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO panneaux_solaires (nom, energie_unitaire_w, pourcentage, prix_unitaire) VALUES (?, ?, ?, ?)",
+        (nom, float(energie_unitaire_w), float(pourcentage), float(prix_unitaire))
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+def get_all_panneaux():
+    """Récupère tous les panneaux solaires."""
+    from models.panneau_solaire import PanneauSolaire
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, nom, energie_unitaire_w, pourcentage, prix_unitaire FROM panneaux_solaires")
+    rows = cursor.fetchall()
+    cursor.close()
+    conn.close()
+
+    panneaux = []
+    for row in rows:
+        panneaux.append(PanneauSolaire(
+            id=row[0],
+            nom=row[1],
+            energie_unitaire_w=row[2],
+            pourcentage=row[3],
+            prix_unitaire=row[4]
+        ))
+    return panneaux
+
+
+def delete_panneau(panneau_id):
+    """Supprime un panneau par son ID."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM panneaux_solaires WHERE id = ?", (panneau_id,))
+    affected = cursor.rowcount
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return affected > 0

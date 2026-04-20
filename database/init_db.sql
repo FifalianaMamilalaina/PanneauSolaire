@@ -61,3 +61,25 @@ INSERT INTO appareils (nom, puissance_w, heure_debut, heure_fin, tranche) VALUES
     ('Radio', 15, 7, 13, 'matin'),
     ('Lampe extérieure', 20, 17, 19, 'soir');
 GO
+
+-- =============================================================
+-- Table : panneaux_solaires (Alea 3)
+-- =============================================================
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'panneaux_solaires')
+BEGIN
+    CREATE TABLE panneaux_solaires (
+        id INT PRIMARY KEY IDENTITY(1,1),
+        nom VARCHAR(100) NOT NULL,
+        energie_unitaire_w FLOAT NOT NULL,
+        pourcentage FLOAT NOT NULL,
+        prix_unitaire FLOAT NOT NULL
+    );
+END
+GO
+
+-- Données d'exemple panneaux
+INSERT INTO panneaux_solaires (nom, energie_unitaire_w, pourcentage, prix_unitaire) VALUES
+    ('P1 - Eco', 200, 40, 150000),
+    ('P2 - Standard', 350, 50, 280000),
+    ('P3 - Premium', 500, 60, 450000);
+GO

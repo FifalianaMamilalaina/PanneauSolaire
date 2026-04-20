@@ -17,7 +17,10 @@ from database.crud import (
     get_appareil_by_id,
     delete_appareil,
     save_resultat,
-    get_all_resultats
+    get_all_resultats,
+    insert_panneau,
+    get_all_panneaux,
+    delete_panneau
 )
 from services.simulation_service import simuler_journee
 from utils.conversions import formater_energie, formater_puissance
@@ -154,6 +157,7 @@ class SolaireApp(tk.Tk):
             ("accueil", "🏠  Accueil"),
             ("ajouter", "➕  Ajouter Appareil"),
             ("liste", "📋  Liste Appareils"),
+            ("panneaux", "🔆  Panneaux"),
             ("simulation", "🚀  Simulation"),
             ("historique", "📜  Historique"),
         ]
@@ -211,6 +215,7 @@ class SolaireApp(tk.Tk):
             "accueil": self._page_accueil,
             "ajouter": self._page_ajouter,
             "liste": self._page_liste,
+            "panneaux": self._page_panneaux,
             "simulation": self._page_simulation,
             "historique": self._page_historique,
         }
@@ -541,6 +546,143 @@ class SolaireApp(tk.Tk):
                 messagebox.showerror("Erreur", f"Impossible de supprimer :\n{e}")
 
     # ------------------------------------------
+    # PAGE: Panneaux Solaires (Alea 3)
+    # ------------------------------------------
+    def _page_panneaux(self):
+        """Page de gestion des types de panneaux solaires."""
+        self._make_header(self.main_area, "Panneaux Solaires",
+                          "Définir les types de panneaux disponibles à l'achat")
+
+        # --- Formulaire d'ajout ---
+        card = self._make_card(self.main_area)
+        card.columnconfigure(1, weight=1)
+
+        tk.Label(card, text="➕  Ajouter un panneau", font=self.font_subheading,
+                 bg=COLORS["bg_card"], fg=COLORS["solar_yellow"]).grid(
+            row=0, column=0, columnspan=2, padx=15, pady=(10, 5), sticky="w")
+
+        self._pn_nom = self._make_entry(card, "Nom du panneau :", 1)
+        self._pn_energie = self._make_entry(card, "Énergie unitaire (W) :", 2)
+        self._pn_pourcentage = self._make_entry(card, "Pourcentage rendement (%) :", 3)
+        self._pn_prix = self._make_entry(card, "Prix unitaire (Ar) :", 4)
+
+        # Info
+        info_frame = tk.Frame(card, bg=COLORS["bg_card"])
+        info_frame.grid(row=5, column=0, columnspan=2, padx=15, pady=5)
+        tk.Label(info_frame,
+                 text="ℹ️  Puissance réelle = Énergie unitaire × Pourcentage / 100",
+                 font=self.font_small, bg=COLORS["bg_card"],
+                 fg=COLORS["text_muted"]).pack()
+
+        btn_frame = tk.Frame(card, bg=COLORS["bg_card"])
+        btn_frame.grid(row=6, column=0, columnspan=2, pady=10)
+        self._make_button(btn_frame, "✅  Ajouter le panneau",
+                          self._action_ajouter_panneau,
+                          color=COLORS["battery_green"], width=30).pack()
+
+        self._pn_message = tk.Label(self.main_area, text="", font=self.font_body,
+                                    bg=COLORS["bg_dark"], fg=COLORS["success"])
+        self._pn_message.pack(pady=5)
+
+        # --- Tableau des panneaux ---
+        tree_frame = tk.Frame(self.main_area, bg=COLORS["bg_dark"])
+        tree_frame.pack(fill=tk.BOTH, expand=True, padx=30, pady=(0, 10))
+
+        columns = ("id", "nom", "energie", "pourcentage", "reel", "prix")
+        self._pn_tree = ttk.Treeview(tree_frame, columns=columns, show="headings",
+                                      style="Dark.Treeview", selectmode="browse")
+
+        headers = {
+            "id": ("ID", 50),
+            "nom": ("Nom", 150),
+            "energie": ("Énergie (W)", 110),
+            "pourcentage": ("Rendement (%)", 110),
+            "reel": ("Réel (W)", 100),
+            "prix": ("Prix (Ar)", 120),
+        }
+        for col, (text, width) in headers.items():
+            self._pn_tree.heading(col, text=text)
+            self._pn_tree.column(col, width=width, anchor="center")
+
+        scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self._pn_tree.yview,
+                                  style="Dark.Vertical.TScrollbar")
+        self._pn_tree.configure(yscrollcommand=scrollbar.set)
+        self._pn_tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+
+        # Boutons
+        btn_frame2 = tk.Frame(self.main_area, bg=COLORS["bg_dark"])
+        btn_frame2.pack(fill=tk.X, padx=30, pady=(0, 20))
+        self._make_button(btn_frame2, "🗑️  Supprimer sélection",
+                          self._action_supprimer_panneau,
+                          color=COLORS["danger"], width=25).pack(side=tk.LEFT, padx=(0, 10))
+        self._make_button(btn_frame2, "🔄  Rafraîchir",
+                          lambda: self.show_page("panneaux"),
+                          color=COLORS["battery_blue"], width=15).pack(side=tk.LEFT)
+
+        self._charger_panneaux()
+
+    def _charger_panneaux(self):
+        """Charge les panneaux dans le Treeview."""
+        for item in self._pn_tree.get_children():
+            self._pn_tree.delete(item)
+        try:
+            panneaux = get_all_panneaux()
+            for p in panneaux:
+                self._pn_tree.insert("", tk.END, values=(
+                    p.id, p.nom, f"{p.energie_unitaire_w:.1f}",
+                    f"{p.pourcentage:.1f}", f"{p.puissance_reelle_w:.1f}",
+                    f"{p.prix_unitaire:.0f}"
+                ))
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible de charger les panneaux :\n{e}")
+
+    def _action_ajouter_panneau(self):
+        """Ajoute un panneau."""
+        nom = self._pn_nom.get().strip()
+        if not nom:
+            messagebox.showwarning("Champ manquant", "Le nom du panneau est requis.")
+            return
+        try:
+            energie = float(self._pn_energie.get().strip())
+            pourcentage = float(self._pn_pourcentage.get().strip())
+            prix = float(self._pn_prix.get().strip())
+        except ValueError:
+            messagebox.showwarning("Valeur invalide",
+                                   "Énergie, pourcentage et prix doivent être des nombres.")
+            return
+
+        try:
+            insert_panneau(nom, energie, pourcentage, prix)
+            reel = energie * pourcentage / 100
+            self._pn_message.config(
+                text=f"✅ '{nom}' ajouté — {energie}W × {pourcentage}% = {reel:.1f}W réel, {prix:.0f} Ar",
+                fg=COLORS["success"])
+            self._pn_nom.delete(0, tk.END)
+            self._pn_energie.delete(0, tk.END)
+            self._pn_pourcentage.delete(0, tk.END)
+            self._pn_prix.delete(0, tk.END)
+            self._charger_panneaux()
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible d'ajouter le panneau :\n{e}")
+
+    def _action_supprimer_panneau(self):
+        """Supprime le panneau sélectionné."""
+        selected = self._pn_tree.selection()
+        if not selected:
+            messagebox.showinfo("Information", "Veuillez sélectionner un panneau à supprimer.")
+            return
+        item = self._pn_tree.item(selected[0])
+        panneau_id = item["values"][0]
+        nom = item["values"][1]
+        if messagebox.askyesno("Confirmation", f"Supprimer le panneau '{nom}' (ID {panneau_id}) ?"):
+            try:
+                delete_panneau(panneau_id)
+                self._charger_panneaux()
+            except Exception as e:
+                messagebox.showerror("Erreur", f"Impossible de supprimer :\n{e}")
+
+    # ------------------------------------------
     # PAGE: Simulation
     # ------------------------------------------
     def _page_simulation(self):
@@ -601,7 +743,13 @@ class SolaireApp(tk.Tk):
             messagebox.showinfo("Information", "Aucun appareil enregistré.\nAjoutez des appareils d'abord.")
             return
 
-        resultat = simuler_journee(appareils)
+        # Charger les panneaux pour Alea 3
+        try:
+            panneaux = get_all_panneaux()
+        except Exception:
+            panneaux = []
+
+        resultat = simuler_journee(appareils, panneaux=panneaux)
 
         if resultat.get("erreur"):
             messagebox.showerror("Erreur", resultat["erreur"])
@@ -854,6 +1002,107 @@ class SolaireApp(tk.Tk):
                          fg=fg, anchor="w").pack(side=tk.LEFT)
 
             tk.Frame(hourly_card, bg=COLORS["bg_card"], height=10).pack()
+
+        # ==========================================================
+        # ALEA 3 : Sélection de panneaux solaires
+        # ==========================================================
+        alea3 = resultat.get("alea3", [])
+        if alea3:
+            # Titre section
+            tk.Frame(container, bg=COLORS["battery_green"], height=3).pack(fill=tk.X, padx=30, pady=(20, 0))
+            alea3_header = tk.Frame(container, bg=COLORS["bg_dark"])
+            alea3_header.pack(fill=tk.X, padx=30, pady=(5, 10))
+            tk.Label(alea3_header, text="🎲  ALEA 3 — Sélection de Panneaux Solaires",
+                     font=self.font_heading, bg=COLORS["bg_dark"],
+                     fg=COLORS["battery_green"]).pack(anchor="w")
+
+            puissance_req = resultat["panneau_puissance_w"]
+            tk.Label(alea3_header,
+                     text=f"Puissance théorique requise : {formater_puissance(puissance_req)} — "
+                          f"Prix total pour chaque type de panneau",
+                     font=self.font_small, bg=COLORS["bg_dark"],
+                     fg=COLORS["text_muted"]).pack(anchor="w")
+
+            # Tableau comparatif
+            table_card = tk.Frame(container, bg=COLORS["bg_card"],
+                                  highlightbackground=COLORS["battery_green"],
+                                  highlightthickness=1)
+            table_card.pack(fill=tk.X, padx=30, pady=5)
+
+            # En-têtes
+            header_frame = tk.Frame(table_card, bg=COLORS["bg_card"])
+            header_frame.pack(fill=tk.X, padx=15, pady=(10, 5))
+            header_cols = ["Rang", "Nom", "Unitaire (W)", "Rendement", "Réel (W)",
+                           "Nb panneaux", "Prix unit.", "Prix TOTAL"]
+            for j, h_text in enumerate(header_cols):
+                tk.Label(header_frame, text=h_text, font=self.font_small,
+                         bg=COLORS["bg_card"], fg=COLORS["solar_yellow"],
+                         width=12, anchor="center").pack(side=tk.LEFT, padx=2)
+
+            tk.Frame(table_card, bg=COLORS["border"], height=1).pack(fill=tk.X, padx=15)
+
+            # Lignes (triées par prix total croissant)
+            for idx, opt in enumerate(alea3):
+                is_best = (idx == 0)
+                row_bg = COLORS["bg_card"]
+                row_frame = tk.Frame(table_card, bg=row_bg)
+                row_frame.pack(fill=tk.X, padx=15, pady=2)
+
+                rang_text = f"🏆 {idx + 1}" if is_best else f"   {idx + 1}"
+                fg_color = COLORS["success"] if is_best else COLORS["text_secondary"]
+                prix_fg = COLORS["success"] if is_best else COLORS["text_primary"]
+
+                values = [
+                    rang_text,
+                    opt["nom"],
+                    f"{opt['energie_unitaire_w']:.0f} W",
+                    f"{opt['pourcentage']:.0f}%",
+                    f"{opt['puissance_reelle_w']:.1f} W",
+                    f"{opt['nb_panneaux']}",
+                    f"{opt['prix_unitaire']:.0f} Ar",
+                    f"{opt['prix_total']:.0f} Ar",
+                ]
+
+                for j, val in enumerate(values):
+                    fg = prix_fg if j == len(values) - 1 else fg_color
+                    tk.Label(row_frame, text=val, font=self.font_body,
+                             bg=row_bg, fg=fg, width=12,
+                             anchor="center").pack(side=tk.LEFT, padx=2)
+
+            # Meilleur choix en évidence
+            best = alea3[0]
+            best_card = tk.Frame(container, bg=COLORS["bg_card"],
+                                 highlightbackground=COLORS["success"],
+                                 highlightthickness=2)
+            best_card.pack(fill=tk.X, padx=30, pady=(10, 5))
+
+            tk.Label(best_card,
+                     text=f"🏆  Meilleur choix : {best['nom']} — "
+                          f"{best['nb_panneaux']} panneau(x) × {best['prix_unitaire']:.0f} Ar = "
+                          f"{best['prix_total']:.0f} Ar",
+                     font=self.font_subheading, bg=COLORS["bg_card"],
+                     fg=COLORS["success"]).pack(padx=15, pady=10)
+
+            tk.Label(best_card,
+                     text=f"Puissance totale fournie : {best['puissance_totale_w']:.1f} W "
+                          f"(besoin : {puissance_req:.1f} W)",
+                     font=self.font_body, bg=COLORS["bg_card"],
+                     fg=COLORS["text_secondary"]).pack(padx=15, pady=(0, 10))
+
+            tk.Frame(table_card, bg=COLORS["bg_card"], height=10).pack()
+
+        elif not resultat.get("alea3"):
+            # Aucun panneau défini
+            tk.Frame(container, bg=COLORS["battery_green"], height=3).pack(fill=tk.X, padx=30, pady=(20, 0))
+            no_pn_card = tk.Frame(container, bg=COLORS["bg_card"],
+                                   highlightbackground=COLORS["border"],
+                                   highlightthickness=1)
+            no_pn_card.pack(fill=tk.X, padx=30, pady=5)
+            tk.Label(no_pn_card,
+                     text="🔆  ALEA 3 — Aucun panneau défini. "
+                          "Ajoutez des panneaux dans la page 'Panneaux' pour voir la comparaison.",
+                     font=self.font_body, bg=COLORS["bg_card"],
+                     fg=COLORS["text_muted"]).pack(padx=15, pady=10)
 
         # --- Sauvegarder ---
         try:

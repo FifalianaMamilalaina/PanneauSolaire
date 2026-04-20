@@ -42,3 +42,21 @@ on va changer un peu les appareils et les tranches d'heure
 dans la configuration actuelle, si on ajoute un appareil dans la tranche d'heure le matin, dans la configuration actuelle, ca signifie que l'appareil en question fonctionne a 100% du temps dans cette tranche d'heure
 on va ajouter un nouveau champ qui estt durre
 ca definira la durree dans laquelle l'appareil sera utiliser dans cette tranche d'heure pour ne pas qu'il soit utiliser a 100% du temps dans cette ttranche d'heure
+
+alea3:
+en fonction de nos besoins(appareils, nuit, jour, soirree, batterie, etc), on aura besoin d'acheter des panneaux, 
+les panneaux sont definis comme ceci:
+le nom deja: p1
+ensuite enerigie unitaire: un paneau de ce type peu donner n puissance
+en suite, pourcentage: depuis l'energie unitaire, un panneau peux donner x d'energie en realite
+prix unitaire
+
+on devrait avoir la liste des panneaux et voir ses caracteristiques chacunes pour savoir le(s)quel(s) sera le mieux pour subvenir a nos besoins
+on doit aussi avoir le prix total pour avoir les bons panneaux
+
+Demandes a faire suite :
+- ils ont leurs parametrages par panneau
+- on donne son energie unitaire
+- on cherche donc le prix total pour atteindre la theorie utile
+pour chaque panneau de type
+- et lister ensuite le prix total pour chaque panneau
