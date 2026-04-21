@@ -60,3 +60,64 @@ Demandes a faire suite :
 - on cherche donc le prix total pour atteindre la theorie utile
 pour chaque panneau de type
 - et lister ensuite le prix total pour chaque panneau
+
+
+on a maintenant la puissance theorique requise, la puissance fournis par chaque categorie de panneau
+du coup maintenant, on va trier la puissance theorique requise le jour, la soiree et la nuit, 
+on va avoir un prix d'achat de la puissance theorique requise le jour et la soiree, qui ne seront pas pareils et qui seront parametrable via un nouveau lien qui est parametre
+les jours ouvrables, les prix d'achats ne sont pas les memes que pendant le weekend
+
+Dans la simulation, on va avoir la possibilite de voir la quantite de puissance vendable(pour chaque type de panneau) le jour et la soiree, les prix d'achats et le prix total en jour ouvrable et en weekend
+
+Vendable = puissance fournis pas les panneaux en trop
+
+Logique de Valorisation de l'Énergie Solaire Excédentaire
+L'idée centrale est de ne plus laisser aucun Watt produit par les plaques s'évaporer. Si l'énergie n'est pas consommée par les appareils, elle est immédiatement transformée en gain financier.
+
+1. La Source : Le Surplus Direct
+Le calcul se base sur la puissance maximale de la plaque (ex: 300W).
+
+Énergie vendable = (Puissance Max de la plaque) - (Consommation réelle à l'instant T).
+
+Exemple : Si votre plaque produit 300W mais que vous n'utilisez que 100W, le système vend automatiquement les 200W restants.
+
+Important : On ne touche absolument pas à la batterie. C'est uniquement l'énergie directe "en temps réel".
+
+2. Tranches Horaires de Vente (Période Solaire)
+La vente se fait uniquement durant la journée, là où le soleil est actif :
+
+Tranche principale : 06h00 à 17h00.
+
+Tranche secondaire : 17h00 à 19h00 (énergie résiduelle).
+
+3. Configuration des Tarifs (Dynamic Pricing)
+Le prix n'est pas fixe, il dépend du type de jour pour maximiser la rentabilité :
+
+Tarif Jour Ouvrable (Lundi-Vendredi) : Prix X (ex: 100 Ar / Watt).
+
+Tarif Week-end (Samedi-Dimanche) : Prix Y (ex: 150 Ar / Watt).
+
+Le système doit permettre de configurer ces deux prix séparément.
+
+4. Calcul et Cumul
+Le système cumule chaque Watt non utilisé minute par minute durant les tranches horaires définies. À la fin de la journée, il calcule la somme totale.
+
+Structure de l'Affichage Final (Output)
+Le résultat final doit présenter le bilan financier de la manière suivante :
+
+Montant de base : (Le total initial, ex: 120 700 Ar).
+
+Revenu Supplémentaire (Jours Ouvrables) : Gain cumulé de l'énergie non utilisée durant la semaine.
+
+Revenu Supplémentaire (Week-end) : Gain cumulé de l'énergie non utilisée durant le week-end.
+
+Total Général : Somme de tous les revenus.
+
+Ce qu'il faut configurer dans le code :
+Une variable prix_ouvrable et prix_weekend.
+
+Une fonction qui détecte si on est entre 06h et 19h.
+
+Un calcul : disponible = P_max_plaque - P_consommée_actuelle.
+
+Une condition pour vérifier si le jour actuel est un jour de semaine ou un week-end afin d'appliquer le bon tarif.

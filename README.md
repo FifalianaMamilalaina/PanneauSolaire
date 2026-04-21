@@ -305,6 +305,12 @@ Le système doit fournir :
 ---
 
 ## Version
+<<<<<<< HEAD
 * Python 3.13.1
 * Microsoft SQL Server 2025 (RTM) - 17.0.1000.7 (X64)
 
+=======
+
+* Python 3.13.1
+* Microsoft SQL Server 2025 (RTM) - 17.0.1000.7 (X64)
+>>>>>>> 8067e05 (Ajout vente d'energi)

@@ -105,13 +105,14 @@ def calculer_pic_consommation(appareils):
     }
 
 
-def simuler_journee(appareils, panneaux=None):
+def simuler_journee(appareils, panneaux=None, prix_energie=None):
     """
     Simule une journée complète avec Alea 1, Alea 2 et Alea 3.
     
     Args:
         appareils: Liste des appareils
         panneaux: Liste de PanneauSolaire (optionnel, pour Alea 3)
+        prix_energie: dict des prix d'achat énergie (optionnel)
     """
     if not appareils:
         return {
@@ -148,7 +149,19 @@ def simuler_journee(appareils, panneaux=None):
     alea3 = []
     if panneaux:
         puissance_requise = ref["panneau_puissance_w"]
-        alea3 = calculer_options_panneaux(puissance_requise, panneaux)
+        alea3 = calculer_options_panneaux(puissance_requise, panneaux, energies_tranche)
+
+        # Calculer les revenus de vente si les prix sont disponibles
+        if prix_energie:
+            for opt in alea3:
+                e_jour = opt["energie_vendable_jour_wh"]
+                e_soir = opt["energie_vendable_soir_wh"]
+                opt["revenu_jour_ouvrable"] = round(e_jour * prix_energie["prix_jour_ouvrable"], 2)
+                opt["revenu_soir_ouvrable"] = round(e_soir * prix_energie["prix_soir_ouvrable"], 2)
+                opt["revenu_total_ouvrable"] = round(opt["revenu_jour_ouvrable"] + opt["revenu_soir_ouvrable"], 2)
+                opt["revenu_jour_weekend"] = round(e_jour * prix_energie["prix_jour_weekend"], 2)
+                opt["revenu_soir_weekend"] = round(e_soir * prix_energie["prix_soir_weekend"], 2)
+                opt["revenu_total_weekend"] = round(opt["revenu_jour_weekend"] + opt["revenu_soir_weekend"], 2)
 
     # --- 6. Statut global ---
     if autonomie_ok and ref["recharge_ok"]:
@@ -206,4 +219,7 @@ def simuler_journee(appareils, panneaux=None):
 
         # ALEA 3
         "alea3": alea3,
+
+        # Prix énergie
+        "prix_energie": prix_energie or {},
     }

@@ -83,3 +83,26 @@ INSERT INTO panneaux_solaires (nom, energie_unitaire_w, pourcentage, prix_unitai
     ('P2 - Standard', 350, 50, 280000),
     ('P3 - Premium', 500, 60, 450000);
 GO
+
+-- =============================================================
+-- Table : prix_energie (prix d'achat énergie par tranche/jour)
+-- =============================================================
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'prix_energie')
+BEGIN
+    CREATE TABLE prix_energie (
+        id INT PRIMARY KEY IDENTITY(1,1),
+        prix_jour_ouvrable FLOAT NOT NULL DEFAULT 50,
+        prix_soir_ouvrable FLOAT NOT NULL DEFAULT 80,
+        prix_jour_weekend FLOAT NOT NULL DEFAULT 70,
+        prix_soir_weekend FLOAT NOT NULL DEFAULT 100
+    );
+END
+GO
+
+-- Insérer les prix par défaut (une seule ligne)
+IF NOT EXISTS (SELECT * FROM prix_energie)
+BEGIN
+    INSERT INTO prix_energie (prix_jour_ouvrable, prix_soir_ouvrable, prix_jour_weekend, prix_soir_weekend)
+    VALUES (50, 80, 70, 100);
+END
+GO

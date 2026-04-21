@@ -20,7 +20,9 @@ from database.crud import (
     get_all_resultats,
     insert_panneau,
     get_all_panneaux,
-    delete_panneau
+    delete_panneau,
+    get_prix_energie,
+    update_prix_energie
 )
 from services.simulation_service import simuler_journee
 from utils.conversions import formater_energie, formater_puissance
@@ -158,6 +160,7 @@ class SolaireApp(tk.Tk):
             ("ajouter", "➕  Ajouter Appareil"),
             ("liste", "📋  Liste Appareils"),
             ("panneaux", "🔆  Panneaux"),
+            ("parametres", "⚙️  Paramètres"),
             ("simulation", "🚀  Simulation"),
             ("historique", "📜  Historique"),
         ]
@@ -216,6 +219,7 @@ class SolaireApp(tk.Tk):
             "ajouter": self._page_ajouter,
             "liste": self._page_liste,
             "panneaux": self._page_panneaux,
+            "parametres": self._page_parametres,
             "simulation": self._page_simulation,
             "historique": self._page_historique,
         }
@@ -683,6 +687,109 @@ class SolaireApp(tk.Tk):
                 messagebox.showerror("Erreur", f"Impossible de supprimer :\n{e}")
 
     # ------------------------------------------
+    # PAGE: Paramètres (Prix énergie)
+    # ------------------------------------------
+    def _page_parametres(self):
+        """Page de paramétrage des prix d'achat de l'énergie."""
+        self._make_header(self.main_area, "Paramètres",
+                          "Configurer les prix d'achat de l'énergie (Ar/Wh)")
+
+        # Charger les prix actuels
+        try:
+            prix = get_prix_energie()
+        except Exception:
+            prix = {
+                "prix_jour_ouvrable": 50,
+                "prix_soir_ouvrable": 80,
+                "prix_jour_weekend": 70,
+                "prix_soir_weekend": 100,
+            }
+
+        # --- Carte Jours Ouvrables ---
+        card_ouv = self._make_card(self.main_area)
+        card_ouv.columnconfigure(1, weight=1)
+
+        tk.Label(card_ouv, text="📅  Jours Ouvrables (Lundi → Vendredi)",
+                 font=self.font_subheading,
+                 bg=COLORS["bg_card"], fg=COLORS["solar_yellow"]).grid(
+            row=0, column=0, columnspan=2, padx=15, pady=(10, 5), sticky="w")
+
+        self._prix_jour_ouv = self._make_entry(card_ouv, "Prix jour (Ar/Wh) :", 1)
+        self._prix_jour_ouv.insert(0, str(prix["prix_jour_ouvrable"]))
+
+        self._prix_soir_ouv = self._make_entry(card_ouv, "Prix soir (Ar/Wh) :", 2)
+        self._prix_soir_ouv.insert(0, str(prix["prix_soir_ouvrable"]))
+
+        tk.Frame(card_ouv, bg=COLORS["bg_card"], height=8).grid(
+            row=3, column=0, columnspan=2)
+
+        # --- Carte Weekend ---
+        card_wkd = self._make_card(self.main_area)
+        card_wkd.columnconfigure(1, weight=1)
+
+        tk.Label(card_wkd, text="🏖️  Weekend (Samedi → Dimanche)",
+                 font=self.font_subheading,
+                 bg=COLORS["bg_card"], fg=COLORS["solar_yellow"]).grid(
+            row=0, column=0, columnspan=2, padx=15, pady=(10, 5), sticky="w")
+
+        self._prix_jour_wkd = self._make_entry(card_wkd, "Prix jour (Ar/Wh) :", 1)
+        self._prix_jour_wkd.insert(0, str(prix["prix_jour_weekend"]))
+
+        self._prix_soir_wkd = self._make_entry(card_wkd, "Prix soir (Ar/Wh) :", 2)
+        self._prix_soir_wkd.insert(0, str(prix["prix_soir_weekend"]))
+
+        tk.Frame(card_wkd, bg=COLORS["bg_card"], height=8).grid(
+            row=3, column=0, columnspan=2)
+
+        # Bouton enregistrer
+        btn_frame = tk.Frame(self.main_area, bg=COLORS["bg_dark"])
+        btn_frame.pack(fill=tk.X, padx=30, pady=10)
+
+        self._make_button(btn_frame, "💾  Enregistrer les prix",
+                          self._action_enregistrer_prix,
+                          color=COLORS["battery_green"], width=30).pack(anchor="w")
+
+        # Message de feedback
+        self._prix_message = tk.Label(self.main_area, text="", font=self.font_body,
+                                       bg=COLORS["bg_dark"], fg=COLORS["success"])
+        self._prix_message.pack(pady=5)
+
+        # Info
+        info_card = self._make_card(self.main_area)
+        tk.Label(info_card,
+                 text="ℹ️  Ces prix sont utilisés dans la simulation (ALEA 3) pour calculer\n"
+                      "les revenus de vente de l'énergie excédentaire produite par les panneaux.\n"
+                      "Jour = 6h→17h | Soir = 17h→19h | La nuit, les panneaux ne produisent pas.",
+                 font=self.font_small, bg=COLORS["bg_card"],
+                 fg=COLORS["text_muted"], justify="left").pack(padx=15, pady=10)
+
+    def _action_enregistrer_prix(self):
+        """Enregistre les prix d'achat dans la base de données."""
+        try:
+            pjo = float(self._prix_jour_ouv.get().strip())
+            pso = float(self._prix_soir_ouv.get().strip())
+            pjw = float(self._prix_jour_wkd.get().strip())
+            psw = float(self._prix_soir_wkd.get().strip())
+        except ValueError:
+            messagebox.showwarning("Valeur invalide",
+                                   "Tous les prix doivent être des nombres.")
+            return
+
+        if any(v < 0 for v in [pjo, pso, pjw, psw]):
+            messagebox.showwarning("Valeur invalide",
+                                   "Les prix ne peuvent pas être négatifs.")
+            return
+
+        try:
+            update_prix_energie(pjo, pso, pjw, psw)
+            self._prix_message.config(
+                text=f"✅ Prix enregistrés — Ouvrable: {pjo}/{pso} Ar/Wh | "
+                     f"Weekend: {pjw}/{psw} Ar/Wh",
+                fg=COLORS["success"])
+        except Exception as e:
+            messagebox.showerror("Erreur", f"Impossible d'enregistrer :\\n{e}")
+
+    # ------------------------------------------
     # PAGE: Simulation
     # ------------------------------------------
     def _page_simulation(self):
@@ -749,7 +856,13 @@ class SolaireApp(tk.Tk):
         except Exception:
             panneaux = []
 
-        resultat = simuler_journee(appareils, panneaux=panneaux)
+        # Charger les prix d'achat énergie
+        try:
+            prix_energie = get_prix_energie()
+        except Exception:
+            prix_energie = None
+
+        resultat = simuler_journee(appareils, panneaux=panneaux, prix_energie=prix_energie)
 
         if resultat.get("erreur"):
             messagebox.showerror("Erreur", resultat["erreur"])
@@ -1033,11 +1146,13 @@ class SolaireApp(tk.Tk):
             header_frame = tk.Frame(table_card, bg=COLORS["bg_card"])
             header_frame.pack(fill=tk.X, padx=15, pady=(10, 5))
             header_cols = ["Rang", "Nom", "Unitaire (W)", "Rendement", "Réel (W)",
-                           "Nb panneaux", "Prix unit.", "Prix TOTAL"]
+                           "Nb panneaux", "Prix unit.", "Prix TOTAL",
+                           "Vend. Jour", "Vend. Soir"]
             for j, h_text in enumerate(header_cols):
+                w = 10 if j >= 8 else 12
                 tk.Label(header_frame, text=h_text, font=self.font_small,
                          bg=COLORS["bg_card"], fg=COLORS["solar_yellow"],
-                         width=12, anchor="center").pack(side=tk.LEFT, padx=2)
+                         width=w, anchor="center").pack(side=tk.LEFT, padx=2)
 
             tk.Frame(table_card, bg=COLORS["border"], height=1).pack(fill=tk.X, padx=15)
 
@@ -1061,12 +1176,15 @@ class SolaireApp(tk.Tk):
                     f"{opt['nb_panneaux']}",
                     f"{opt['prix_unitaire']:.0f} Ar",
                     f"{opt['prix_total']:.0f} Ar",
+                    formater_energie(opt.get('energie_vendable_jour_wh', 0)),
+                    formater_energie(opt.get('energie_vendable_soir_wh', 0)),
                 ]
 
                 for j, val in enumerate(values):
-                    fg = prix_fg if j == len(values) - 1 else fg_color
+                    fg = prix_fg if j == 7 else fg_color
+                    w = 10 if j >= 8 else 12
                     tk.Label(row_frame, text=val, font=self.font_body,
-                             bg=row_bg, fg=fg, width=12,
+                             bg=row_bg, fg=fg, width=w,
                              anchor="center").pack(side=tk.LEFT, padx=2)
 
             # Meilleur choix en évidence
@@ -1090,6 +1208,88 @@ class SolaireApp(tk.Tk):
                      fg=COLORS["text_secondary"]).pack(padx=15, pady=(0, 10))
 
             tk.Frame(table_card, bg=COLORS["bg_card"], height=10).pack()
+
+            # ==========================================================
+            # Revenus de vente d'énergie excédentaire
+            # ==========================================================
+            prix_e = resultat.get("prix_energie", {})
+            if prix_e and alea3[0].get("revenu_total_ouvrable") is not None:
+                tk.Frame(container, bg=COLORS["solar_orange"], height=3).pack(
+                    fill=tk.X, padx=30, pady=(20, 0))
+                rev_header = tk.Frame(container, bg=COLORS["bg_dark"])
+                rev_header.pack(fill=tk.X, padx=30, pady=(5, 10))
+                tk.Label(rev_header,
+                         text="💰  Revenus de Vente — Énergie Excédentaire",
+                         font=self.font_heading, bg=COLORS["bg_dark"],
+                         fg=COLORS["solar_orange"]).pack(anchor="w")
+                tk.Label(rev_header,
+                         text=f"Prix (Ar/Wh) — Ouvrable: Jour={prix_e['prix_jour_ouvrable']} | "
+                              f"Soir={prix_e['prix_soir_ouvrable']}  •  "
+                              f"Weekend: Jour={prix_e['prix_jour_weekend']} | "
+                              f"Soir={prix_e['prix_soir_weekend']}",
+                         font=self.font_small, bg=COLORS["bg_dark"],
+                         fg=COLORS["text_muted"]).pack(anchor="w")
+
+                for opt in alea3:
+                    rev_card = tk.Frame(container, bg=COLORS["bg_card"],
+                                        highlightbackground=COLORS["solar_orange"],
+                                        highlightthickness=1)
+                    rev_card.pack(fill=tk.X, padx=30, pady=4)
+
+                    tk.Label(rev_card,
+                             text=f"🔆  {opt['nom']} — {opt['nb_panneaux']} panneau(x)",
+                             font=self.font_subheading, bg=COLORS["bg_card"],
+                             fg=COLORS["solar_yellow"]).pack(
+                        fill=tk.X, padx=15, pady=(10, 5))
+
+                    # Sous-header
+                    sh_frame = tk.Frame(rev_card, bg=COLORS["bg_card"])
+                    sh_frame.pack(fill=tk.X, padx=15, pady=2)
+                    sh_labels = ["", "Vendable Jour", "Prix Jour",
+                                 "Vendable Soir", "Prix Soir", "TOTAL"]
+                    for sl in sh_labels:
+                        tk.Label(sh_frame, text=sl, font=self.font_small,
+                                 bg=COLORS["bg_card"], fg=COLORS["solar_yellow"],
+                                 width=14, anchor="center").pack(side=tk.LEFT, padx=1)
+
+                    tk.Frame(rev_card, bg=COLORS["border"], height=1).pack(
+                        fill=tk.X, padx=15)
+
+                    # Ligne Jour Ouvrable
+                    ouv_frame = tk.Frame(rev_card, bg=COLORS["bg_card"])
+                    ouv_frame.pack(fill=tk.X, padx=15, pady=2)
+                    ouv_vals = [
+                        "📅 Ouvrable",
+                        formater_energie(opt.get('energie_vendable_jour_wh', 0)),
+                        f"{opt.get('revenu_jour_ouvrable', 0):.0f} Ar",
+                        formater_energie(opt.get('energie_vendable_soir_wh', 0)),
+                        f"{opt.get('revenu_soir_ouvrable', 0):.0f} Ar",
+                        f"{opt.get('revenu_total_ouvrable', 0):.0f} Ar",
+                    ]
+                    for vi, v in enumerate(ouv_vals):
+                        fg = COLORS["success"] if vi == 5 else COLORS["text_primary"]
+                        tk.Label(ouv_frame, text=v, font=self.font_body,
+                                 bg=COLORS["bg_card"], fg=fg,
+                                 width=14, anchor="center").pack(side=tk.LEFT, padx=1)
+
+                    # Ligne Weekend
+                    wkd_frame = tk.Frame(rev_card, bg=COLORS["bg_card"])
+                    wkd_frame.pack(fill=tk.X, padx=15, pady=2)
+                    wkd_vals = [
+                        "🏖️ Weekend",
+                        formater_energie(opt.get('energie_vendable_jour_wh', 0)),
+                        f"{opt.get('revenu_jour_weekend', 0):.0f} Ar",
+                        formater_energie(opt.get('energie_vendable_soir_wh', 0)),
+                        f"{opt.get('revenu_soir_weekend', 0):.0f} Ar",
+                        f"{opt.get('revenu_total_weekend', 0):.0f} Ar",
+                    ]
+                    for vi, v in enumerate(wkd_vals):
+                        fg = COLORS["success"] if vi == 5 else COLORS["text_primary"]
+                        tk.Label(wkd_frame, text=v, font=self.font_body,
+                                 bg=COLORS["bg_card"], fg=fg,
+                                 width=14, anchor="center").pack(side=tk.LEFT, padx=1)
+
+                    tk.Frame(rev_card, bg=COLORS["bg_card"], height=8).pack()
 
         elif not resultat.get("alea3"):
             # Aucun panneau défini

@@ -102,6 +102,29 @@ def init_database():
         END
     """)
 
+    # Table prix_energie (prix d'achat énergie par tranche/jour)
+    cursor.execute("""
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'prix_energie')
+        BEGIN
+            CREATE TABLE prix_energie (
+                id INT PRIMARY KEY IDENTITY(1,1),
+                prix_jour_ouvrable FLOAT NOT NULL DEFAULT 50,
+                prix_soir_ouvrable FLOAT NOT NULL DEFAULT 80,
+                prix_jour_weekend FLOAT NOT NULL DEFAULT 70,
+                prix_soir_weekend FLOAT NOT NULL DEFAULT 100
+            );
+        END
+    """)
+
+    # Insérer les prix par défaut si la table est vide
+    cursor.execute("""
+        IF NOT EXISTS (SELECT * FROM prix_energie)
+        BEGIN
+            INSERT INTO prix_energie (prix_jour_ouvrable, prix_soir_ouvrable, prix_jour_weekend, prix_soir_weekend)
+            VALUES (50, 80, 70, 100);
+        END
+    """)
+
     conn.commit()
     cursor.close()
     conn.close()

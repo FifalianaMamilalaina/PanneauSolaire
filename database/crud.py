@@ -194,3 +194,62 @@ def delete_panneau(panneau_id):
     cursor.close()
     conn.close()
     return affected > 0
+
+
+# ==========================================
+# CRUD Prix Énergie
+# ==========================================
+
+def get_prix_energie():
+    """Récupère les prix d'achat de l'énergie (ligne unique)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT prix_jour_ouvrable, prix_soir_ouvrable, prix_jour_weekend, prix_soir_weekend "
+        "FROM prix_energie"
+    )
+    row = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    if row:
+        return {
+            "prix_jour_ouvrable": row[0],
+            "prix_soir_ouvrable": row[1],
+            "prix_jour_weekend": row[2],
+            "prix_soir_weekend": row[3],
+        }
+    # Si aucune ligne, insérer les défauts et retourner
+    defaults = {
+        "prix_jour_ouvrable": 50,
+        "prix_soir_ouvrable": 80,
+        "prix_jour_weekend": 70,
+        "prix_soir_weekend": 100,
+    }
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO prix_energie (prix_jour_ouvrable, prix_soir_ouvrable, prix_jour_weekend, prix_soir_weekend) "
+        "VALUES (?, ?, ?, ?)",
+        (defaults["prix_jour_ouvrable"], defaults["prix_soir_ouvrable"],
+         defaults["prix_jour_weekend"], defaults["prix_soir_weekend"])
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return defaults
+
+
+def update_prix_energie(prix_jour_ouvrable, prix_soir_ouvrable, prix_jour_weekend, prix_soir_weekend):
+    """Met à jour les prix d'achat de l'énergie."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE prix_energie SET "
+        "prix_jour_ouvrable=?, prix_soir_ouvrable=?, prix_jour_weekend=?, prix_soir_weekend=?",
+        (float(prix_jour_ouvrable), float(prix_soir_ouvrable),
+         float(prix_jour_weekend), float(prix_soir_weekend))
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
