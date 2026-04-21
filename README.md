@@ -303,3 +303,8 @@ Le système doit fournir :
 * 📊 Détail consommation (jour / nuit)
 
 ---
+
+## Version
+Python 3.13.1
+Microsoft SQL Server 2025 (RTM) - 17.0.1000.7 (X64)
+
